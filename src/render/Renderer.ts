@@ -7,6 +7,7 @@ import {
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { MotionBlurEffect } from './MotionBlurEffect';
+import { TAAPass } from './TAAPass';
 import type { QualityPreset } from './Quality';
 
 export class Renderer {
@@ -17,6 +18,7 @@ export class Renderer {
   readonly toneMapping: ToneMappingEffect;
   private renderPass: RenderPass;
   private aoPass: N8AOPostPass;
+  readonly taa: TAAPass;
   private mbPass: EffectPass;
   private mainPass: EffectPass;
   private smaaPass: EffectPass;
@@ -33,6 +35,8 @@ export class Renderer {
   private pendingPixelRatio = 0; // applied at the START of the next frame (see render())
   gpuBudgetMs = 13; // set by the frame pacer
   dynamicResolution = true;
+  private readonly lastCamPos = new THREE.Vector3();
+  private readonly lastCamQuat = new THREE.Quaternion();
 
   constructor(readonly canvas: HTMLCanvasElement, private scene: THREE.Scene, private camera: THREE.PerspectiveCamera) {
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: false, powerPreference: 'high-performance', stencil: false, depth: true, preserveDrawingBuffer: new URLSearchParams(location.search).has('capture') });
@@ -51,6 +55,10 @@ export class Renderer {
     this.aoPass.configuration.distanceFalloff = 1.2;
     this.aoPass.configuration.intensity = 2.2;
     this.composer.addPass(this.aoPass);
+    // Temporal AA sits after SSAO (so the AO noise is also filtered) and before everything that works on the
+    // anti-aliased image (motion blur, bloom, tone mapping).
+    this.taa = new TAAPass(camera);
+    this.composer.addPass(this.taa);
     // Motion blur and the NaN/HDR sanitiser share one full-screen pass. The sanitiser must run in a pass BEFORE
     // bloom: bloom builds its mip chain from its own pass's raw input, so a clamp inside the bloom pass would not
     // stop a single NaN pixel (full-screen black flash) or a sun glint on the clearcoat (white flash).
@@ -69,6 +77,7 @@ export class Renderer {
     this.camera = camera;
     this.renderPass.mainCamera = camera;
     this.aoPass.camera = camera;
+    this.taa.renderCamera = camera;
     this.mbPass.mainCamera = camera;
     this.mainPass.mainCamera = camera;
     this.smaaPass.mainCamera = camera;
@@ -84,9 +93,12 @@ export class Renderer {
     this.aoPass.setQualityMode(q.ssaoMode);
     this.aoPass.configuration.halfRes = true;
     this.bloom.intensity = q.bloom ? 0.35 : 0;
-    this.smaaPass.enabled = q.smaa;
+    this.taa.enabled = q.taa;
+    this.taa.invalidate();
+    // SMAA is the fallback when TAA is off (it cannot fix sub-pixel crawl, TAA can)
+    this.smaaPass.enabled = q.smaa && !q.taa;
     // postprocessing only presents the pass flagged renderToScreen: make it the last *enabled* pass
-    const passes = [this.renderPass, this.aoPass, this.mbPass, this.mainPass, this.smaaPass];
+    const passes = [this.renderPass, this.aoPass, this.taa, this.mbPass, this.mainPass, this.smaaPass];
     passes.forEach((p) => (p.renderToScreen = false));
     [...passes].reverse().find((p) => p.enabled)!.renderToScreen = true;
     this.gpuHistN = 0;
@@ -144,6 +156,15 @@ export class Renderer {
       this.gpuHistN = 0;
       this.motionBlur.reset();
     }
+    // camera cut (mode change, reset, teleport): drop temporal history instead of smearing the old view
+    const cp = this.camera.position;
+    if (cp.distanceToSquared(this.lastCamPos) > 36 || this.camera.quaternion.dot(this.lastCamQuat) ** 2 < 0.93) {
+      this.taa.invalidate();
+      this.motionBlur.reset();
+    }
+    this.lastCamPos.copy(cp);
+    this.lastCamQuat.copy(this.camera.quaternion);
+    this.taa.applyJitter(this.camera);
     this.renderer.info.reset();
     this.motionBlur.updateCamera(this.camera, this.quality?.motionBlur ? motionStrength : 0);
     const gl = this.renderer.getContext() as WebGL2RenderingContext;
@@ -154,6 +175,7 @@ export class Renderer {
       if (q) gl.beginQuery(this.timerExt.TIME_ELAPSED_EXT, q);
     }
     this.composer.render(dt);
+    this.camera.clearViewOffset();
     if (q && this.timerExt) {
       gl.endQuery(this.timerExt.TIME_ELAPSED_EXT);
       this.queries.push(q);

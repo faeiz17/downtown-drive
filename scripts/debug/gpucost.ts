@@ -14,6 +14,7 @@ const measure = `(async () => {
   const fixScreen = () => { const ps = passes(); ps.forEach(p => p.renderToScreen = false); [...ps].reverse().find(p => p.enabled).renderToScreen = true; };
   out.base = await sample();
   const ao = r.aoPass.enabled; r.aoPass.enabled = false; fixScreen(); out.noAO = await sample(); r.aoPass.enabled = ao; fixScreen();
+  const ta = r.taa.enabled; r.taa.enabled = false; fixScreen(); out.noTAA = await sample(); r.taa.enabled = ta; fixScreen();
   const mb = r.mbPass.enabled; r.mbPass.enabled = false; fixScreen(); out.noMotionBlur = await sample(); r.mbPass.enabled = mb; fixScreen();
   const sh = r.renderer.shadowMap.enabled; r.renderer.shadowMap.enabled = false; g.scene.traverse(o => { if (o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(m => m.needsUpdate = true); }); await sample(10); out.noShadows = await sample(); r.renderer.shadowMap.enabled = sh; g.scene.traverse(o => { if (o.material) (Array.isArray(o.material)?o.material:[o.material]).forEach(m => m.needsUpdate = true); }); await sample(10);
   const pls = []; g.scene.traverse(o => { if (o.isPointLight || o.isSpotLight) { pls.push([o, o.visible]); o.visible = false; } }); await sample(10); out.noPointSpotLights = await sample(); pls.forEach(([o,v]) => o.visible = v); await sample(10);

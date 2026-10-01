@@ -117,6 +117,7 @@ export class Game {
     progress(0.55, 'Loading your Lancer…');
     const gltf = await loadLancerGltf(`${import.meta.env.BASE_URL}models/lancer.glb`);
     this.car = new Car(this.physics, gltf, x, z, heading);
+    this.renderer.taa.setDynamicRoot(this.car.object);
     this.scene.add(this.car.object);
     this.rig = new CameraRig(this.camera, this.physics);
     this.hud = new HUD(ui, this.data);
