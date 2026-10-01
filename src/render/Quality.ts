@@ -8,8 +8,8 @@ export interface QualityPreset {
   pixelRatio: number; // max render pixel ratio (CSS px → device px); DynamicResolution may go lower
   minPixelRatio: number; // floor for dynamic resolution
   shadows: boolean;
-  shadowMapSize: number;
-  shadowRange: number; // half-size of the shadow camera box (m)
+  shadowMapSize: number; // per cascade (3 cascades)
+  shadowRange: number; // how far from the camera shadows reach (m)
   ssao: boolean;
   ssaoMode: 'Performance' | 'Low' | 'Medium';
   bloom: boolean;
@@ -26,15 +26,15 @@ export interface QualityPreset {
 
 export const QUALITY: Record<QualityName, QualityPreset> = {
   low: {
-    name: 'low', pixelRatio: 1, minPixelRatio: 0.6, shadows: false, shadowMapSize: 1024, shadowRange: 40, ssao: false, ssaoMode: 'Performance', bloom: true, motionBlur: false, smaa: false, taa: false,
+    name: 'low', pixelRatio: 1, minPixelRatio: 0.6, shadows: false, shadowMapSize: 1024, shadowRange: 60, ssao: false, ssaoMode: 'Performance', bloom: true, motionBlur: false, smaa: false, taa: false,
     drawDistance: 480, propNear: 90, propFar: 280, traffic: 20, pointLights: 0, headlightShadows: false,
   },
   medium: {
-    name: 'medium', pixelRatio: 1, minPixelRatio: 0.7, shadows: true, shadowMapSize: 2048, shadowRange: 55, ssao: true, ssaoMode: 'Performance', bloom: true, motionBlur: true, smaa: false, taa: true,
+    name: 'medium', pixelRatio: 1, minPixelRatio: 0.7, shadows: true, shadowMapSize: 1024, shadowRange: 130, ssao: true, ssaoMode: 'Performance', bloom: true, motionBlur: true, smaa: false, taa: true,
     drawDistance: 800, propNear: 140, propFar: 460, traffic: 45, pointLights: 0, headlightShadows: false,
   },
   high: {
-    name: 'high', pixelRatio: 1.25, minPixelRatio: 0.85, shadows: true, shadowMapSize: 2048, shadowRange: 70, ssao: true, ssaoMode: 'Performance', bloom: true, motionBlur: true, smaa: true, taa: true,
+    name: 'high', pixelRatio: 1.25, minPixelRatio: 0.85, shadows: true, shadowMapSize: 2048, shadowRange: 200, ssao: true, ssaoMode: 'Performance', bloom: true, motionBlur: true, smaa: true, taa: true,
     drawDistance: 1200, propNear: 190, propFar: 650, traffic: 70, pointLights: 3, headlightShadows: false,
   },
 };

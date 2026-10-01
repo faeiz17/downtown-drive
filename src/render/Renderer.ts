@@ -3,11 +3,12 @@
 // frame stays inside its budget on high-DPI screens (three-best-practices: pixel ratio, post-processing, merged passes).
 import * as THREE from 'three';
 import {
-  EffectComposer, RenderPass, EffectPass, Effect, BloomEffect, ToneMappingEffect, ToneMappingMode, SMAAEffect, SMAAPreset, VignetteEffect,
+  EffectComposer, RenderPass, EffectPass, Effect, BloomEffect, ToneMappingEffect, ToneMappingMode, SMAAEffect, SMAAPreset, VignetteEffect, LUT3DEffect,
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { MotionBlurEffect } from './MotionBlurEffect';
 import { TAAPass } from './TAAPass';
+import { createGradeLUT, LAHORE_GRADE, type GradeParams } from './Grade';
 import type { QualityPreset } from './Quality';
 
 export class Renderer {
@@ -16,6 +17,7 @@ export class Renderer {
   readonly motionBlur = new MotionBlurEffect();
   readonly bloom: BloomEffect;
   readonly toneMapping: ToneMappingEffect;
+  readonly lut: LUT3DEffect;
   private renderPass: RenderPass;
   private aoPass: N8AOPostPass;
   readonly taa: TAAPass;
@@ -67,7 +69,9 @@ export class Renderer {
     this.bloom = new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1.55, luminanceSmoothing: 0.35, intensity: 0.35, radius: 0.42 });
     this.toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
     const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.45 });
-    this.mainPass = new EffectPass(camera, this.bloom, this.toneMapping, vignette);
+    // colour grade (LUT) after tone mapping, in display space, like a film LUT
+    this.lut = new LUT3DEffect(createGradeLUT(LAHORE_GRADE));
+    this.mainPass = new EffectPass(camera, this.bloom, this.toneMapping, this.lut, vignette);
     this.composer.addPass(this.mainPass);
     this.smaaPass = new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.MEDIUM }));
     this.composer.addPass(this.smaaPass);
@@ -119,6 +123,13 @@ export class Renderer {
     this.composer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  /** Rebuild the grade LUT (dev tuning panel). */
+  setGrade(p: GradeParams): void {
+    const old = this.lut.lut;
+    this.lut.lut = createGradeLUT(p);
+    old?.dispose();
   }
 
   set exposure(v: number) {

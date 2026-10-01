@@ -12,7 +12,7 @@ const measure = `(async () => {
   for (let round = 0; round < 4; round++) for (const [k, v] of Object.entries(cfgs)) {
     r.aoPass.enabled = v !== null; r.taa.enabled = v !== 'taa';
     if (Array.isArray(v)) { c.aoSamples = v[0]; c.denoiseSamples = v[1]; c.denoiseRadius = v[2]; } else { c.aoSamples = 8; c.denoiseSamples = 4; c.denoiseRadius = 12; }
-    g.dayNight.sun.castShadow = v !== 'sh';
+    g.shadows.lights.forEach((l) => (l.castShadow = v !== 'sh'));
     const ms = await sample(36); out[k] = Math.min(out[k] ?? 99, ms);
   }
   stop = true; return out;

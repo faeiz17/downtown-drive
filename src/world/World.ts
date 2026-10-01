@@ -83,7 +83,11 @@ export class World {
   private spanChunks = new Map<number, number[]>(); // pole index (span start)
   quality: WorldQuality = { drawDistance: 800, propNear: 140, propFar: 500, shadows: true, shadowRange: 55 };
   private get shadowRadius(): number {
-    return this.quality.shadowRange * 1.25 + 15;
+    return this.quality.shadowRange + 20;
+  }
+  /** every lit material the world uses (registered with the shadow cascades at start-up) */
+  get litMaterials(): THREE.Material[] {
+    return [this.atlasMat, this.asphaltMat, this.markMat, this.signMat, this.adMat, this.waterMat, this.lampLensMat, this.propMat, this.treeMat];
   }
   private nightFactor = 0;
   stats = { chunksBuilt: 0, chunksVisible: 0, colliders: 0, lastBuildMs: 0 };

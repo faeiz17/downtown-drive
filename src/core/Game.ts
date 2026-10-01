@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { WorldData } from '../data/types';
 import { Renderer } from '../render/Renderer';
 import { DayNight } from '../render/DayNight';
+import { SunShadows } from '../render/SunShadows';
 import { NightLights } from '../render/NightLights';
 import { QUALITY, type QualityPreset } from '../render/Quality';
 import { World } from '../world/World';
@@ -28,6 +29,7 @@ export class Game {
   readonly camera = new THREE.PerspectiveCamera(62, 1, 0.1, 6000);
   readonly renderer: Renderer;
   readonly dayNight: DayNight;
+  readonly shadows: SunShadows;
   readonly physics: PhysicsWorld;
   readonly world: World;
   readonly input: Input;
@@ -73,7 +75,8 @@ export class Game {
     this.quality = QUALITY[settings.quality];
     this.renderer = new Renderer(canvas, this.scene, this.camera);
     this.physics = new PhysicsWorld(R);
-    this.dayNight = new DayNight(this.scene, this.renderer.renderer);
+    this.shadows = new SunShadows(this.scene, this.camera);
+    this.dayNight = new DayNight(this.scene, this.renderer.renderer, this.shadows);
     this.world = new World(data, this.physics);
     this.scene.add(this.world.scene);
     this.traffic = new TrafficManager(data, this.physics, this.scene);
@@ -91,7 +94,7 @@ export class Game {
     this.quality = QUALITY[qName] ?? QUALITY.medium;
     const q = this.quality;
     this.renderer.applyQuality(q);
-    this.dayNight.setShadowQuality(q.shadows, q.shadowMapSize, q.shadowRange);
+    this.shadows.configure({ enabled: q.shadows, mapSize: q.shadowMapSize, maxFar: q.shadowRange });
     this.dayNight.cycleMinutes = this.params.has('hour') && !this.params.has('cycle') ? 0 : s.cycleMinutes;
     this.dayNight.smog = s.smog;
     this.world.setQuality({ drawDistance: q.drawDistance, propNear: q.propNear, propFar: q.propFar, shadows: q.shadows, shadowRange: q.shadowRange });
@@ -115,6 +118,7 @@ export class Game {
     const z = parseFloat(this.params.get('z') ?? String(sp.z));
     const heading = parseFloat(this.params.get('heading') ?? String(sp.heading));
     progress(0.55, 'Loading your Lancer…');
+    const skyReady = this.dayNight.load(import.meta.env.BASE_URL);
     const gltf = await loadLancerGltf(`${import.meta.env.BASE_URL}models/lancer.glb`);
     this.car = new Car(this.physics, gltf, x, z, heading);
     this.renderer.taa.setDynamicRoot(this.car.object);
@@ -144,8 +148,13 @@ export class Game {
       this.physics.step();
     }
     progress(0.92, 'Warming up shaders…');
+    await skyReady;
     this.rig.menuOrbit(0, this.car.vehicle.position);
-    this.dayNight.update(0, this.car.vehicle.position, this.camera.position);
+    // every lit material has to know about the shadow cascades (see SunShadows)
+    for (const m of this.world.litMaterials) this.shadows.patch(m);
+    this.shadows.patchObject(this.scene);
+    this.dayNight.update(0);
+    this.shadows.update();
     this.world.setNight(this.dayNight.state.night);
     this.car.updateVisual(0, 1);
     this.renderer.renderer.compile(this.scene, this.camera);
@@ -384,7 +393,7 @@ export class Game {
     // ---- world, time of day, traffic
     if (this.mode !== 'pause') {
       P.begin('dayNight');
-      this.dayNight.update(dt, carPos, this.camera.position);
+      this.dayNight.update(dt);
       const night = this.dayNight.state.night;
       this.world.setNight(night);
       car.visual.night = night;
@@ -432,6 +441,7 @@ export class Game {
     }
 
     // ---- render
+    this.shadows.update();
     this.renderer.exposure = this.dayNight.exposure;
     const blur = this.mode === 'play' && (this.rig.mode === 'chase' || this.rig.mode === 'far') ? Math.min(1, Math.max(0, (v.kmh - 50) / 120)) * 0.6 : 0;
     P.begin('render');
