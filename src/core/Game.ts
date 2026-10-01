@@ -66,6 +66,8 @@ export class Game {
   /** ?autopilot=<km/h>: follows the road network (benchmarks / attract mode) */
   autopilotKmh = parseFloat(new URLSearchParams(location.search).get('autopilot') ?? '0');
   private autopilotStuck = 0;
+  /** debug switch for scripts/test-smoothness.ts: false renders the raw latest physics state */
+  interpolate = true;
 
   constructor(readonly canvas: HTMLCanvasElement, R: Rapier, readonly data: WorldData, public settings: Settings) {
     this.quality = QUALITY[settings.quality];
@@ -343,7 +345,8 @@ export class Game {
       }
     }
     P.end();
-    const alpha = this.accumulator / this.physics.dt;
+    // render the car between the last two physics states (alpha = how far into the next step this frame is)
+    const alpha = this.interpolate ? this.accumulator / this.physics.dt : 1;
     P.begin('carVisual');
     car.updateVisual(dt, alpha);
     P.end();

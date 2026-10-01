@@ -13,6 +13,8 @@ export class Car {
   private indicatorSteerPeak = 0;
   private prevPos = new THREE.Vector3();
   private prevQuat = new THREE.Quaternion();
+  private curPos = new THREE.Vector3();
+  private curQuat = new THREE.Quaternion();
   private hasPrev = false;
 
   constructor(physics: PhysicsWorld, gltfScene: THREE.Group, x: number, z: number, heading: number) {
@@ -25,8 +27,11 @@ export class Car {
   }
 
   physicsStep(dt: number, input: DriveInput): void {
-    this.prevPos.copy(this.vehicle.position);
-    this.prevQuat.copy(this.vehicle.quaternion);
+    // Previous state for render interpolation = the body's pose right before this step runs. (It must be read
+    // from the body: vehicle.position is only refreshed inside vehicle.step, so it is one step older.)
+    const t = this.vehicle.body.translation(), r = this.vehicle.body.rotation();
+    this.prevPos.set(t.x, t.y, t.z);
+    this.prevQuat.set(r.x, r.y, r.z, r.w);
     this.hasPrev = true;
     this.vehicle.step(dt, input);
   }
@@ -40,7 +45,7 @@ export class Car {
   updateVisual(dt: number, alpha: number): void {
     const v = this.vehicle;
     const t = v.body.translation(), r = v.body.rotation();
-    const cur = new THREE.Vector3(t.x, t.y, t.z), curQ = new THREE.Quaternion(r.x, r.y, r.z, r.w);
+    const cur = this.curPos.set(t.x, t.y, t.z), curQ = this.curQuat.set(r.x, r.y, r.z, r.w);
     if (this.hasPrev) {
       this.visual.root.position.lerpVectors(this.prevPos, cur, alpha);
       this.visual.root.quaternion.slerpQuaternions(this.prevQuat, curQ, alpha);

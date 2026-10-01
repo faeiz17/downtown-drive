@@ -16,7 +16,10 @@
     "build:car": "tsx scripts/build-car.ts",
     "validate:car": "tsx scripts/validate-car.ts",
     "test:physics": "tsx scripts/test-physics.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "test:smoothness": "tsx scripts/test-smoothness.ts",
+    "bench": "tsx scripts/bench.ts",
+    "screens": "tsx scripts/screens.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

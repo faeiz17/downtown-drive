@@ -33,6 +33,21 @@ const CHASE = {
 };
 
 const damp = (lambda: number, dt: number) => 1 - Math.exp(-lambda * dt);
+
+/**
+ * Exact exponential follow of a target that moved linearly from `prev` to `cur` during dt.
+ * Plain damping (x += (cur − x)·(1 − e^(−λdt))) trails a moving target by an amount that depends on dt, so frame
+ * time jitter shows up as camera jitter. The closed-form solution of dx/dt = λ(target(t) − x) trails by exactly
+ * velocity/λ whatever the frame time is.
+ */
+function followLinear(x: number, prev: number, cur: number, lambda: number, dt: number): number {
+  if (dt <= 0) return x;
+  const u = (cur - prev) / dt / lambda;
+  return cur - u + (x - prev + u) * Math.exp(-lambda * dt);
+}
+function followVec(x: THREE.Vector3, prev: THREE.Vector3, cur: THREE.Vector3, lambda: number, dt: number): void {
+  x.set(followLinear(x.x, prev.x, cur.x, lambda, dt), followLinear(x.y, prev.y, cur.y, lambda, dt), followLinear(x.z, prev.z, cur.z, lambda, dt));
+}
 const smoothstep = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -58,6 +73,9 @@ export class CameraRig {
   private readonly dir = new THREE.Vector3();
   private readonly lookTarget = new THREE.Vector3();
   private readonly local = new THREE.Vector3();
+  private readonly prevDesired = new THREE.Vector3();
+  private readonly prevLookTarget = new THREE.Vector3();
+  private prevTargetHeading = 0;
 
   constructor(readonly camera: THREE.PerspectiveCamera, private physics: PhysicsWorld) {}
 
@@ -109,10 +127,18 @@ export class CameraRig {
         dv = Math.atan2(Math.sin(dv), Math.cos(dv));
         targetHeading = carHeading + dv * CHASE.velocityBlend * smoothstep(4, 14, speed);
       }
-      if (!this.initialised) this.heading = targetHeading;
-      let dh = targetHeading - this.heading;
+      if (!this.initialised) {
+        this.heading = targetHeading;
+        this.prevTargetHeading = targetHeading;
+      }
+      // unwrap the target relative to last frame so the follow works across the ±π seam
+      let dT = targetHeading - this.prevTargetHeading;
+      dT = Math.atan2(Math.sin(dT), Math.cos(dT));
+      const unwrapped = this.prevTargetHeading + dT;
+      let dh = this.heading - this.prevTargetHeading;
       dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-      this.heading += dh * damp(car.speed < -1 ? CHASE.reverseHeadingLambda : CHASE.headingLambda, dt);
+      this.heading = followLinear(this.prevTargetHeading + dh, this.prevTargetHeading, unwrapped, car.speed < -1 ? CHASE.reverseHeadingLambda : CHASE.headingLambda, dt);
+      this.prevTargetHeading = targetHeading;
 
       const far = this.mode === 'far';
       const extra = Math.min(kmh, CHASE.maxExtraKmh);
@@ -130,13 +156,15 @@ export class CameraRig {
       this.obstacleDist = !this.initialised || want < this.obstacleDist ? want : this.obstacleDist + (want - this.obstacleDist) * damp(3, dt);
       if (this.obstacleDist < L) desired.copy(target).addScaledVector(dir, this.obstacleDist);
       if (!this.initialised) this.pos.copy(desired);
-      else this.pos.lerp(desired, damp(CHASE.positionLambda, dt));
+      else followVec(this.pos, this.prevDesired, desired, CHASE.positionLambda, dt);
+      this.prevDesired.copy(desired);
       if (this.pos.y < car.position.y + 0.5) this.pos.y = car.position.y + 0.5;
 
       const ahead = Math.min(speed * 0.12, 3.5) * (lookBack ? -1 : 1);
       const lookAhead = this.lookTarget.copy(target).addScaledVector(fwd, ahead);
       if (!this.initialised) this.look.copy(lookAhead);
-      else this.look.lerp(lookAhead, damp(CHASE.lookLambda, dt));
+      else followVec(this.look, this.prevLookTarget, lookAhead, CHASE.lookLambda, dt);
+      this.prevLookTarget.copy(lookAhead);
       cam.position.copy(this.pos);
       const fovTarget = CHASE.fovBase + Math.min(kmh, CHASE.fovMaxKmh) * CHASE.fovPerKmh;
       this.fov += (fovTarget - this.fov) * damp(CHASE.fovLambda, dt);
