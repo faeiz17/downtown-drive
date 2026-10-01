@@ -1,0 +1,42 @@
+{
+  "name": "gulberg-drive",
+  "private": true,
+  "version": "1.0.0",
+  "description": "GTA-style open-world driving game: drive the owner's Mitsubishi Lancer GLX through Gulberg, Lahore, built from OpenStreetMap data.",
+  "type": "module",
+  "scripts": {
+    "predev": "tsx scripts/ensure-assets.ts",
+    "dev": "vite",
+    "prebuild": "tsx scripts/ensure-assets.ts",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "fetch:osm": "tsx scripts/fetch-osm.ts",
+    "build:world": "tsx scripts/build-world.ts",
+    "build:car": "tsx scripts/build-car.ts",
+    "validate:car": "tsx scripts/validate-car.ts",
+    "test:physics": "tsx scripts/test-physics.ts",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.21.0",
+    "n8ao": "2.0.1",
+    "postprocessing": "6.39.5",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "4.5.0",
+    "@gltf-transform/extensions": "4.5.0",
+    "@types/node": "^22.10.0",
+    "@types/three": "0.186.0",
+    "gltf-validator": "2.0.0-dev.3.10",
+    "meshoptimizer": "1.1.1",
+    "playwright-core": "1.63.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "7.3.6"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}
