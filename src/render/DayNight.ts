@@ -45,7 +45,7 @@ const SKY: Record<SkyName, { sunU: number; sunEl: number; show: number; light: n
   // sunU = horizontal texture coordinate of the brightest point, sunEl = its elevation in degrees (scripts/debug/hdr-sun.ts)
   day: { sunU: 0.5996, sunEl: 43.2, show: 1.7, light: 1.0, tint: [1.0, 0.985, 0.95] },
   dusk: { sunU: 0.6045, sunEl: 2.1, show: 1.0, light: 0.5, tint: [1.0, 0.93, 0.9] },
-  night: { sunU: 0.7822, sunEl: 84.4, show: 0.1, light: 0.07, tint: [1.0, 0.86, 0.72] },
+  night: { sunU: 0.7822, sunEl: 84.4, show: 0.1, light: 0.4, tint: [1.0, 0.86, 0.72] },
 };
 
 const skyVert = /* glsl */ `

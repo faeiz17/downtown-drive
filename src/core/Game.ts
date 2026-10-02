@@ -33,6 +33,8 @@ export class Game {
   readonly dayNight: DayNight;
   readonly shadows: SunShadows;
   readonly rainFx: Rain;
+  /** soft cool light that follows the car after dark (constant light count: no shader recompiles) */
+  private readonly carFill: THREE.PointLight;
   readonly physics: PhysicsWorld;
   readonly world: World;
   readonly input: Input;
@@ -87,6 +89,8 @@ export class Game {
     this.shadows = new SunShadows(this.scene, this.camera);
     this.dayNight = new DayNight(this.scene, this.renderer.renderer, this.shadows);
     this.rainFx = new Rain(this.scene);
+    this.carFill = new THREE.PointLight(0xa9c2ff, 0, 9, 2);
+    this.scene.add(this.carFill);
     this.world = new World(data, this.physics);
     this.scene.add(this.world.scene);
     this.traffic = new TrafficManager(data, this.physics, this.scene);
@@ -427,7 +431,10 @@ export class Game {
       this.dayNight.update(dt);
       const night = this.dayNight.state.night;
       this.world.setNight(night);
+      this.world.poolMat.opacity *= 1 - 0.3 * this.wet;
       car.visual.night = night;
+      this.carFill.position.set(carPos.x, carPos.y + 3.2, carPos.z).addScaledVector(this.scratchFwd.set(Math.sin(v.heading), 0, Math.cos(v.heading)), -1.5);
+      this.carFill.intensity = night * 55;
       if (!this.autoLightsDone && night > 0.55 && this.mode === 'play') {
         car.headlightsOn = true;
         this.autoLightsDone = true;

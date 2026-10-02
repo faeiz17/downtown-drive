@@ -35,6 +35,7 @@ export class CarVisual {
   private baseY: number[] = [];
   private spin = [0, 0, 0, 0];
   night = 0;
+  private envMats: { m: THREE.MeshStandardMaterial; base: number }[] = [];
 
   constructor(gltfScene: THREE.Group) {
     this.root = gltfScene;
@@ -126,6 +127,7 @@ export class CarVisual {
         const pm = mm as THREE.MeshPhysicalMaterial;
         if (pm.isMeshPhysicalMaterial && pm.clearcoat > 0) pm.clearcoatRoughness = Math.max(pm.clearcoatRoughness, 0.08);
         if (mm.name === 'Paint') mm.envMapIntensity = 0.9;
+        if (mm.name === 'Paint' || mm.name.startsWith('Glass') || mm.name === 'Chrome' || mm.name === 'Mirror') this.envMats.push({ m: mm, base: 0 });
         if (mm.name === 'LensClear') {
           mm.roughness = 0.18;
           mm.color.set(0x8e979e);
@@ -172,6 +174,11 @@ export class CarVisual {
   }
 
   update(dt: number): void {
+    // the night sky gives little to reflect: lift the car's reflections so the body keeps its shape and shine
+    for (const e of this.envMats) {
+      if (!e.base) e.base = e.m.envMapIntensity || 1;
+      e.m.envMapIntensity = e.base * (1 + this.night * 4.5);
+    }
     this.blinkT += dt;
     const blinkOn = (this.blinkT % 0.8) < 0.45;
     const L = this.lights;
