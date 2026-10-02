@@ -101,6 +101,38 @@ export class World {
     this.markMat = createMarkingMaterial();
     this.signMat = new THREE.MeshStandardMaterial({ map: this.signage.signTexture, emissiveMap: this.signage.signTexture, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.5 });
     this.adMat = new THREE.MeshStandardMaterial({ map: this.signage.adTexture, emissiveMap: this.signage.adTexture, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.45 });
+    // digital billboards: each face cycles through the 16 campaigns with a cross-fade, drawn as an LED panel
+    // (dot grid that fades out with distance, slow scan roll, a little shimmer) and emissive even in daylight
+    this.adMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = this.treeUniforms.uTime;
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
+          uniform float uTime;
+          vec3 adSample(float idx, vec2 loc, vec2 dx, vec2 dy) {
+            idx = mod(idx, 16.0);
+            vec2 cell = vec2(mod(idx, 4.0), 3.0 - floor(idx / 4.0));
+            return textureGrad(map, (cell + clamp(loc, 0.004, 0.996)) / 4.0, dx, dy).rgb;
+          }
+          vec3 adColor;`)
+        .replace('#include <map_fragment>', `
+          vec2 aUv4 = vMapUv * 4.0;
+          vec2 aCell = floor(aUv4);
+          float aIdx = (3.0 - aCell.y) * 4.0 + aCell.x;
+          vec2 aLoc = fract(aUv4);
+          vec2 aDx = dFdx(vMapUv), aDy = dFdy(vMapUv);
+          float aT = uTime / 9.0 + aIdx * 0.37;
+          float aMix = smoothstep(0.86, 1.0, fract(aT));
+          vec3 aCur = adSample(aIdx + floor(aT), aLoc, aDx, aDy);
+          adColor = aMix > 0.001 ? mix(aCur, adSample(aIdx + floor(aT) + 1.0, aLoc, aDx, aDy), aMix) : aCur;
+          vec2 aPx = aLoc * vec2(170.0, 85.0);
+          float aFade = 1.0 - clamp(max(fwidth(aPx.x), fwidth(aPx.y)) * 1.4, 0.0, 1.0);
+          vec2 aG = abs(fract(aPx) - 0.5) * 2.0;
+          adColor *= 1.0 - aFade * 0.32 * smoothstep(0.55, 1.0, max(aG.x, aG.y));
+          adColor *= 0.95 + 0.05 * sin(aLoc.y * 120.0 - uTime * 6.0) + 0.02 * sin(uTime * 37.0 + aIdx);
+          diffuseColor.rgb *= adColor;`)
+        .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= adColor;');
+    };
+    this.adMat.customProgramCacheKey = () => 'led-billboard-v1';
     this.waterMat = createWaterMaterial();
     this.wireMat = createWireMaterial();
     this.lampLensMat = new THREE.MeshStandardMaterial({ color: 0xfff1d6, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.3 });
@@ -574,7 +606,7 @@ export class World {
     this.nightFactor = f;
     this.atlasMat.emissiveIntensity = f * 1.6;
     this.signMat.emissiveIntensity = f * 1.4;
-    this.adMat.emissiveIntensity = f * 1.1;
+    this.adMat.emissiveIntensity = 0.45 + f * 1.5;
     this.lampLensMat.emissiveIntensity = f * 9;
     this.poolMat.opacity = f * 0.55;
     this.poolField.group.visible = f > 0.02;
