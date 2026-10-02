@@ -359,7 +359,7 @@ export async function buildLancerNodes(log = console.log): Promise<{ nodes: Node
   const spoiler = new Part('Spoiler', 'Paint');
   {
     const deck = (x: number, z: number) => cast(exterior, [x, 3, z], [0, -1, 0])!.p.y;
-    const zLead = -1.93, chord = 0.2, halfW = 0.38; // tail lamps start at |x| = 0.46: the lip stays clear of them
+    const zLead = -1.9, chord = 0.15, halfW = 0.56; // spans the lid; the lip fades out before the tail lamps (|x| > 0.46)
     const prof = new THREE.Shape(); // side profile, s = distance rearwards, y = height above the lid
     prof.moveTo(0, 0);
     prof.bezierCurveTo(0.07, 0.004, 0.14, 0.02, chord, 0.072); // sweeps up into the lip
@@ -370,7 +370,7 @@ export async function buildLancerNodes(log = console.log): Promise<{ nodes: Node
     const dp = duck.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < dp.count; i++) {
       const sx = dp.getX(i), yy = dp.getY(i), x = dp.getZ(i) - halfW;
-      const taper = 1 - Math.pow(Math.abs(x) / halfW, 3) * 0.55; // lip fades out towards the corners
+      const taper = 1 - Math.pow(Math.abs(x) / halfW, 2.2) * 0.92; // lip fades out towards the corners
       const z = zLead - sx;
       dp.setXYZ(i, x, deck(Math.max(-halfW * 0.92, Math.min(halfW * 0.92, x)), z) + 0.012 + yy * (yy > 0 ? taper : 1), z);
     }

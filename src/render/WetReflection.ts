@@ -65,10 +65,12 @@ export class WetReflection {
     this.hide.forEach((o) => (o.visible = false));
     r.shadowMap.autoUpdate = false;
     r.clippingPlanes = [this.plane];
+    wetUniforms.tReflect.value = null; // the road is clipped away in this pass, but must not sample the target it draws into
     r.setRenderTarget(this.rt);
     r.clear();
     r.render(this.scene, vc);
     r.clippingPlanes = [];
+    wetUniforms.tReflect.value = this.rt.texture;
     r.setRenderTarget(prevTarget);
     r.shadowMap.autoUpdate = prevShadow;
     this.hide.forEach((o, i) => (o.visible = vis[i]));
