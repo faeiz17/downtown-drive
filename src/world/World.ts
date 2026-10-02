@@ -14,7 +14,7 @@ import { prepareStrokes, emitAsphalt, emitMarkings, emitCurbs, type StrokePrep }
 import { layoutPlots, type PlotLayout } from './plots';
 import { emitOsmBuilding, emitPlot, emitBillboard, normalize, type BuildCtx } from './buildingGeom';
 import { PropField } from './PropField';
-import { buildTreeModels, buildLampModels, buildPoleModels, buildTankModel, buildSolarModel, buildLanternModel, makePoolTexture, type TreeModel } from './propModels';
+import { buildTreeModels, makeLeafAtlas, buildLampModels, buildPoleModels, buildTankModel, buildSolarModel, buildLanternModel, makePoolTexture, type TreeModel } from './propModels';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
 import type { Profiler } from '../core/Profiler';
 
@@ -105,7 +105,7 @@ export class World {
     this.wireMat = createWireMaterial();
     this.lampLensMat = new THREE.MeshStandardMaterial({ color: 0xfff1d6, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.3 });
     this.propMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.1 });
-    this.treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true });
+    this.treeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, map: makeLeafAtlas(), alphaTest: 0.42, side: THREE.DoubleSide });
     this.treeMat.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = this.treeUniforms.uTime;
       sh.vertexShader = sh.vertexShader

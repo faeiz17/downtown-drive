@@ -26,10 +26,10 @@ export interface CarPose {
 
 /** Tuning (kept together instead of scattered literals). */
 const CHASE = {
-  distance: 4.7, height: 1.4, targetHeight: 0.9, distPerKmh: 0.003, maxExtraKmh: 300,
+  distance: 4.7, height: 1.4, targetHeight: 0.9, distPerKmh: 0.0009, maxExtraKmh: 300,
   farDistance: 7.6, farHeight: 2.5, farDistPerKmh: 0.008,
   dropPerKmh: 0.0009, // the camera sinks a little with speed: the road rushes past closer to the lens
-  boostDistance: 0.55,
+  boostDistance: 0.2,
   headingLambda: 6.5, // how quickly the camera swings round behind the car
   reverseHeadingLambda: 2.0,
   positionLambda: 16, // residual positional smoothing (very tight: the heading does the work)
