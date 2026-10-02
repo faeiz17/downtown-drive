@@ -1,18 +1,29 @@
-// In-game HUD: analog speedometer + tachometer, gear, indicator/headlight/handbrake tell-tales, clock, street name,
-// minimap, FPS overlay and toast messages.
+// In-game HUD in the style of an arcade street racer: a thin tachometer arc with the speed as big digits inside it,
+// the gear in a box that turns red at the shift point, a nitrous arc underneath, tell-tales, drift score,
+// street name, minimap, FPS overlay and toast messages.
 import type { WorldData } from '../data/types';
 import { Minimap } from './Minimap';
 
 export interface HudState {
   kmh: number;
   rpm: number;
+  redline: number;
   gear: string;
+  /** nitrous tank 0..1 and whether it is burning */
+  nitro: number;
+  nitroActive: boolean;
+  /** points of the drift in progress (0 when not drifting) */
+  driftScore: number;
+  /** last finished drift and a counter that changes each time one is banked */
+  driftBanked: number;
+  driftBankedCount: number;
   indicatorLeft: boolean;
   indicatorRight: boolean;
   blink: boolean;
   headlights: boolean;
   handbrake: boolean;
-  hour: number;
+  /** e.g. "NIGHT · RAIN" */
+  scene: string;
   street: string;
   units: 'kmh' | 'mph';
   x: number;
@@ -21,54 +32,78 @@ export interface HudState {
   camera: string;
 }
 
+const SIZE = 300;
+const MAX_RPM = 9000;
+const A0 = Math.PI * 0.75, A1 = Math.PI * 2.25; // tachometer sweep (270°), open at the bottom
+const N0 = Math.PI * 0.69, N1 = Math.PI * 0.31; // nitrous arc sits in the gap at the bottom (drawn right-to-left)
+const FONT = '"Avenir Next Condensed", "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif';
+
 export class HUD {
   readonly root: HTMLDivElement;
   readonly minimap: Minimap;
-  private speedo: HTMLCanvasElement;
-  private sctx: CanvasRenderingContext2D;
+  private gauge: HTMLCanvasElement;
+  private g: CanvasRenderingContext2D;
+  private face: HTMLCanvasElement; // static dial face, drawn once
   private gearEl: HTMLDivElement;
   private speedEl: HTMLDivElement;
   private unitEl: HTMLDivElement;
-  private clockEl: HTMLDivElement;
+  private sceneEl: HTMLDivElement;
   private streetEl: HTMLDivElement;
+  private driftEl: HTMLDivElement;
+  private driftNum: HTMLSpanElement;
   private tell: Record<string, HTMLDivElement> = {};
   private fpsEl: HTMLDivElement;
   private toastEl: HTMLDivElement;
   private toastT = 0;
   private lastStreet = '';
   private streetT = 0;
+  private lastBanked = 0;
+  private bankT = 0;
+  private rpmShown = 900;
+  private lastSpeedText = '';
+  private lastGear = '';
+  private dpr: number;
 
   constructor(parent: HTMLElement, world: WorldData) {
     this.root = document.createElement('div');
     this.root.className = 'hud';
     this.root.innerHTML = `
       <div class="hud-street"></div>
+      <div class="hud-drift"><span class="hud-drift-label">DRIFT</span><span class="hud-drift-num">0</span></div>
       <div class="hud-map"><div class="hud-attrib">© OpenStreetMap contributors</div></div>
       <div class="hud-dash">
-        <canvas class="hud-speedo"></canvas>
-        <div class="hud-readout"><div class="hud-speed">0</div><div class="hud-unit">km/h</div><div class="hud-gear">D1</div></div>
+        <canvas class="hud-gauge"></canvas>
+        <div class="hud-readout">
+          <div class="hud-gear">1</div>
+          <div class="hud-speed">0</div>
+          <div class="hud-unit">KM/H</div>
+        </div>
+        <div class="hud-nos">NOS</div>
         <div class="hud-tells">
           <div class="tell tell-left">◀</div><div class="tell tell-head">◉</div><div class="tell tell-hb">(P)</div><div class="tell tell-right">▶</div>
         </div>
       </div>
-      <div class="hud-clock"></div>
+      <div class="hud-scene"></div>
       <div class="hud-fps"></div>
       <div class="hud-toast"></div>`;
     parent.appendChild(this.root);
-    this.minimap = new Minimap(world, 220);
+    this.minimap = new Minimap(world, 210);
     this.root.querySelector('.hud-map')!.prepend(this.minimap.canvas);
-    this.speedo = this.root.querySelector('.hud-speedo') as HTMLCanvasElement;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.speedo.width = 250 * dpr;
-    this.speedo.height = 250 * dpr;
-    this.speedo.style.width = this.speedo.style.height = '250px';
-    this.sctx = this.speedo.getContext('2d')!;
-    this.sctx.scale(dpr, dpr);
+    this.gauge = this.root.querySelector('.hud-gauge') as HTMLCanvasElement;
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.gauge.width = this.gauge.height = SIZE * this.dpr;
+    this.gauge.style.width = this.gauge.style.height = `${SIZE}px`;
+    this.g = this.gauge.getContext('2d')!;
+    this.face = document.createElement('canvas');
+    this.face.width = this.face.height = SIZE * this.dpr;
+    this.drawFace();
     this.gearEl = this.root.querySelector('.hud-gear') as HTMLDivElement;
     this.speedEl = this.root.querySelector('.hud-speed') as HTMLDivElement;
     this.unitEl = this.root.querySelector('.hud-unit') as HTMLDivElement;
-    this.clockEl = this.root.querySelector('.hud-clock') as HTMLDivElement;
+    this.sceneEl = this.root.querySelector('.hud-scene') as HTMLDivElement;
     this.streetEl = this.root.querySelector('.hud-street') as HTMLDivElement;
+    this.driftEl = this.root.querySelector('.hud-drift') as HTMLDivElement;
+    this.driftNum = this.root.querySelector('.hud-drift-num') as HTMLSpanElement;
     this.fpsEl = this.root.querySelector('.hud-fps') as HTMLDivElement;
     this.toastEl = this.root.querySelector('.hud-toast') as HTMLDivElement;
     for (const k of ['left', 'right', 'head', 'hb']) this.tell[k] = this.root.querySelector(`.tell-${k}`) as HTMLDivElement;
@@ -99,16 +134,23 @@ export class HUD {
 
   update(dt: number, s: HudState, traffic: { x: number; z: number }[]): void {
     const speed = s.units === 'mph' ? s.kmh * 0.621371 : s.kmh;
-    this.speedEl.textContent = String(Math.round(speed));
-    this.unitEl.textContent = s.units === 'mph' ? 'mph' : 'km/h';
-    this.gearEl.textContent = s.gear;
+    const speedText = String(Math.round(speed));
+    if (speedText !== this.lastSpeedText) {
+      this.speedEl.textContent = speedText;
+      this.lastSpeedText = speedText;
+    }
+    this.unitEl.textContent = s.units === 'mph' ? 'MPH' : 'KM/H';
+    if (s.gear !== this.lastGear) {
+      this.gearEl.textContent = s.gear;
+      this.lastGear = s.gear;
+    }
+    this.gearEl.classList.toggle('shift', s.rpm > s.redline - 250 && s.gear !== 'R');
     this.gearEl.classList.toggle('rev', s.gear === 'R');
     this.tell.left.classList.toggle('on', s.indicatorLeft && s.blink);
     this.tell.right.classList.toggle('on', s.indicatorRight && s.blink);
     this.tell.head.classList.toggle('on', s.headlights);
     this.tell.hb.classList.toggle('on', s.handbrake);
-    const h = Math.floor(s.hour), m = Math.floor((s.hour - h) * 60);
-    this.clockEl.textContent = `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+    if (this.sceneEl.textContent !== s.scene) this.sceneEl.textContent = s.scene;
     if (s.street !== this.lastStreet) {
       this.lastStreet = s.street;
       this.streetT = s.street ? 4 : 0;
@@ -118,69 +160,125 @@ export class HUD {
     this.streetEl.classList.toggle('show', this.streetT > 0);
     this.toastT -= dt;
     if (this.toastT <= 0) this.toastEl.classList.remove('show');
-    this.drawSpeedo(speed, s.rpm, s.units);
-    this.minimap.draw(dt, s.x, s.z, s.heading, traffic, Math.min(1, s.kmh / 140) * 0.6);
+    // drift score: live while sliding, then the banked total flashes
+    if (s.driftBankedCount !== this.lastBanked) {
+      this.lastBanked = s.driftBankedCount;
+      this.bankT = 1.6;
+      this.driftNum.textContent = `+${s.driftBanked.toLocaleString('en-US')}`;
+    }
+    this.bankT -= dt;
+    const live = s.driftScore > 25;
+    if (live && this.bankT <= 0) this.driftNum.textContent = Math.round(s.driftScore).toLocaleString('en-US');
+    this.driftEl.classList.toggle('show', live || this.bankT > 0);
+    this.driftEl.classList.toggle('banked', this.bankT > 0);
+    this.drawGauge(dt, s);
+    this.minimap.draw(dt, s.x, s.z, s.heading, traffic, Math.min(1, s.kmh / 200) * 0.6);
   }
 
-  private drawSpeedo(speed: number, rpm: number, units: string): void {
-    const c = this.sctx, C = 125, R = 112;
-    c.clearRect(0, 0, 250, 250);
-    // dial background
-    const g = c.createRadialGradient(C, C, 20, C, C, R);
-    g.addColorStop(0, 'rgba(10,12,16,0.78)');
-    g.addColorStop(1, 'rgba(10,12,16,0.45)');
-    c.fillStyle = g;
+  /** Static dial: backing disc, ticks, numerals, red zone, nitrous track. */
+  private drawFace(): void {
+    const c = this.face.getContext('2d')!;
+    c.scale(this.dpr, this.dpr);
+    const C = SIZE / 2, R = SIZE / 2 - 14;
+    const bg = c.createRadialGradient(C, C, R * 0.2, C, C, R + 12);
+    bg.addColorStop(0, 'rgba(6,9,14,0.5)');
+    bg.addColorStop(0.75, 'rgba(6,9,14,0.3)');
+    bg.addColorStop(1, 'rgba(6,9,14,0)');
+    c.fillStyle = bg;
     c.beginPath();
-    c.arc(C, C, R, 0, Math.PI * 2);
+    c.arc(C, C, R + 12, 0, Math.PI * 2);
     c.fill();
-    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
-    const maxV = units === 'mph' ? 140 : 220;
-    // tacho arc (inner)
-    const rpmFrac = Math.min(1, rpm / 7000);
-    c.lineWidth = 7;
-    c.strokeStyle = 'rgba(255,255,255,0.12)';
+    // track
+    c.lineCap = 'butt';
+    c.lineWidth = 2;
+    c.strokeStyle = 'rgba(255,255,255,0.28)';
     c.beginPath();
-    c.arc(C, C, R - 38, a0, a1);
+    c.arc(C, C, R, A0, A1);
     c.stroke();
-    c.strokeStyle = rpm > 6200 ? '#ff4d3a' : '#ffb400';
+    // red zone
+    const ang = (rpm: number) => A0 + ((A1 - A0) * rpm) / MAX_RPM;
+    c.lineWidth = 5;
+    c.strokeStyle = '#ff2d2d';
     c.beginPath();
-    c.arc(C, C, R - 38, a0, a0 + (a1 - a0) * rpmFrac);
+    c.arc(C, C, R - 1.5, ang(7600), A1);
     c.stroke();
-    c.strokeStyle = 'rgba(255,60,50,0.7)';
-    c.beginPath();
-    c.arc(C, C, R - 38, a0 + (a1 - a0) * (6500 / 7000), a1);
-    c.stroke();
-    // speed ticks
-    c.strokeStyle = '#e8e8e8';
-    c.fillStyle = '#e8e8e8';
-    c.font = '600 12px "Segoe UI", Arial';
+    // ticks + numerals
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    for (let v = 0; v <= maxV; v += 10) {
-      const a = a0 + ((a1 - a0) * v) / maxV;
-      const major = v % 20 === 0;
-      c.lineWidth = major ? 2.5 : 1.2;
+    for (let rpm = 0; rpm <= MAX_RPM; rpm += 500) {
+      const a = ang(rpm), major = rpm % 1000 === 0, red = rpm >= 7600;
+      const r0 = R - (major ? 15 : 8);
+      c.lineWidth = major ? 2.4 : 1.2;
+      c.strokeStyle = red ? '#ff4b4b' : major ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.55)';
       c.beginPath();
-      c.moveTo(C + Math.cos(a) * (R - 4), C + Math.sin(a) * (R - 4));
-      c.lineTo(C + Math.cos(a) * (R - (major ? 16 : 10)), C + Math.sin(a) * (R - (major ? 16 : 10)));
+      c.moveTo(C + Math.cos(a) * R, C + Math.sin(a) * R);
+      c.lineTo(C + Math.cos(a) * r0, C + Math.sin(a) * r0);
       c.stroke();
-      if (major && v % 40 === 0) c.fillText(String(v), C + Math.cos(a) * (R - 27), C + Math.sin(a) * (R - 27));
+      if (major) {
+        c.font = `italic 700 15px ${FONT}`;
+        c.fillStyle = red ? '#ff5a5a' : 'rgba(255,255,255,0.92)';
+        c.fillText(String(rpm / 1000), C + Math.cos(a) * (R - 28), C + Math.sin(a) * (R - 28));
+      }
     }
-    // needle
-    const a = a0 + (a1 - a0) * Math.min(1, speed / maxV);
-    c.strokeStyle = '#ff5533';
-    c.lineWidth = 3.5;
+    c.font = `600 9px ${FONT}`;
+    c.fillStyle = 'rgba(255,255,255,0.5)';
+    c.fillText('RPM ×1000', C, C - R + 46);
+    // nitrous track
+    c.lineWidth = 7;
     c.lineCap = 'round';
+    c.strokeStyle = 'rgba(255,255,255,0.14)';
     c.beginPath();
-    c.moveTo(C - Math.cos(a) * 12, C - Math.sin(a) * 12);
-    c.lineTo(C + Math.cos(a) * (R - 12), C + Math.sin(a) * (R - 12));
+    c.arc(C, C, R - 3, N1, N0);
     c.stroke();
-    c.fillStyle = '#222';
+  }
+
+  private drawGauge(dt: number, s: HudState): void {
+    const c = this.g, C = SIZE / 2, R = SIZE / 2 - 14;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, this.gauge.width, this.gauge.height);
+    c.drawImage(this.face, 0, 0);
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // the needle is lightly damped so limiter bounce and shifts read as motion, not flicker
+    this.rpmShown += (s.rpm - this.rpmShown) * Math.min(1, dt * 22);
+    const rpm = Math.max(0, Math.min(MAX_RPM, this.rpmShown));
+    const a = A0 + ((A1 - A0) * rpm) / MAX_RPM;
+    const hot = rpm > s.redline - 250;
+    // swept arc
+    c.lineCap = 'butt';
+    c.lineWidth = 9;
+    const grad = c.createConicGradient ? c.createConicGradient(A0, C, C) : null;
+    if (grad) {
+      grad.addColorStop(0, 'rgba(255,255,255,0.25)');
+      grad.addColorStop(0.55, 'rgba(255,255,255,0.75)');
+      grad.addColorStop(0.75, hot ? 'rgba(255,70,60,0.95)' : 'rgba(255,255,255,0.95)');
+      c.strokeStyle = grad;
+    } else c.strokeStyle = hot ? 'rgba(255,70,60,0.9)' : 'rgba(255,255,255,0.8)';
     c.beginPath();
-    c.arc(C, C, 8, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = 'rgba(255,255,255,0.55)';
-    c.font = '600 10px "Segoe UI", Arial';
-    c.fillText('×1000 rpm', C, C + 58);
+    c.arc(C, C, R - 22, A0, Math.max(A0 + 0.001, a));
+    c.stroke();
+    // needle
+    c.lineCap = 'round';
+    c.shadowColor = hot ? '#ff4030' : '#bfe4ff';
+    c.shadowBlur = 12;
+    c.strokeStyle = hot ? '#ff5a4a' : '#ffffff';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(C + Math.cos(a) * (R - 46), C + Math.sin(a) * (R - 46));
+    c.lineTo(C + Math.cos(a) * (R + 4), C + Math.sin(a) * (R + 4));
+    c.stroke();
+    c.shadowBlur = 0;
+    // nitrous: fills left → right along the bottom gap
+    const n = Math.max(0, Math.min(1, s.nitro));
+    if (n > 0.005) {
+      c.lineWidth = 7;
+      c.lineCap = 'round';
+      c.strokeStyle = s.nitroActive ? '#9df3ff' : n < 0.15 ? '#3d7f95' : '#2fc8f2';
+      c.shadowColor = '#35d6ff';
+      c.shadowBlur = s.nitroActive ? 18 : 6;
+      c.beginPath();
+      c.arc(C, C, R - 3, N0, N0 + (N1 - N0) * n, true);
+      c.stroke();
+      c.shadowBlur = 0;
+    }
   }
 }

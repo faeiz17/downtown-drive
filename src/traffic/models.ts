@@ -15,6 +15,8 @@ export interface VehicleModel {
   width: number;
   height: number;
   speedFactor: number;
+  /** weight relative to a sedan (how hard it is to shove out of the way) */
+  massFactor: number;
   palette: number[];
 }
 
@@ -58,7 +60,7 @@ export function buildVehicleModels(): VehicleModel[] {
     const { paint, fixed, bodyH } = carBody(L, W, H, 1.2, 0.85, 0.52, 0.08);
     for (const x of [-0.74, 0.74]) for (const z of [-1.35, 1.3]) fixed.push(wheel(0.31, 0.2, x, z));
     const lights = [box(0.34, 0.1, 0.02, 0.58, bodyH - 0.12, L / 2 + 0.005, 0xfff4d6), box(0.34, 0.1, 0.02, -0.58, bodyH - 0.12, L / 2 + 0.005, 0xfff4d6), box(0.3, 0.12, 0.02, 0.62, bodyH - 0.1, -L / 2 - 0.005, 0xff1a0a), box(0.3, 0.12, 0.02, -0.62, bodyH - 0.1, -L / 2 - 0.005, 0xff1a0a)];
-    models.push({ kind: 'sedan', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), length: L, width: W, height: H, speedFactor: 1, palette: [0xf2f2f0, 0xf2f2f0, 0xc9ccd0, 0x9ea3a8, 0x1a1a1c, 0x2b3a55, 0x6e1d1d, 0x3d4a3e, 0xf2f2f0, 0xb8bcc0] });
+    models.push({ kind: 'sedan', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 1, length: L, width: W, height: H, speedFactor: 1, palette: [0xf2f2f0, 0xf2f2f0, 0xc9ccd0, 0x9ea3a8, 0x1a1a1c, 0x2b3a55, 0x6e1d1d, 0x3d4a3e, 0xf2f2f0, 0xb8bcc0] });
   }
   // small hatch (Mehran / Alto / Cultus)
   {
@@ -66,7 +68,7 @@ export function buildVehicleModels(): VehicleModel[] {
     const { paint, fixed, bodyH } = carBody(L, W, H, 0.75, 0.25, 0.58, 0.06);
     for (const x of [-0.63, 0.63]) for (const z of [-1.05, 1.1]) fixed.push(wheel(0.27, 0.17, x, z));
     const lights = [box(0.24, 0.12, 0.02, 0.5, bodyH - 0.12, L / 2 + 0.005, 0xfff4d6), box(0.24, 0.12, 0.02, -0.5, bodyH - 0.12, L / 2 + 0.005, 0xfff4d6), box(0.16, 0.2, 0.02, 0.6, bodyH, -L / 2 - 0.005, 0xff1a0a), box(0.16, 0.2, 0.02, -0.6, bodyH, -L / 2 - 0.005, 0xff1a0a)];
-    models.push({ kind: 'hatch', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), length: L, width: W, height: H, speedFactor: 0.9, palette: [0xf2f2f0, 0xf2f2f0, 0xc9ccd0, 0x8a1c1c, 0x1f3f7a, 0x2e2e2e, 0xd8c7a0, 0x47704a] });
+    models.push({ kind: 'hatch', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 0.85, length: L, width: W, height: H, speedFactor: 0.9, palette: [0xf2f2f0, 0xf2f2f0, 0xc9ccd0, 0x8a1c1c, 0x1f3f7a, 0x2e2e2e, 0xd8c7a0, 0x47704a] });
   }
   // auto rickshaw (green body, yellow roof edge, black canopy – Lahore CNG rickshaw)
   {
@@ -87,7 +89,7 @@ export function buildVehicleModels(): VehicleModel[] {
       wheel(0.22, 0.14, -0.58, -0.75),
     ];
     const lights = [box(0.16, 0.16, 0.03, 0, 0.95, 1.16, 0xfff4d6), box(0.12, 0.1, 0.02, 0.5, 0.5, -1.06, 0xff1a0a), box(0.12, 0.1, 0.02, -0.5, 0.5, -1.06, 0xff1a0a)];
-    models.push({ kind: 'rickshaw', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), length: 2.7, width: 1.33, height: 1.75, speedFactor: 0.6, palette: [0x1f7a3a, 0x1f7a3a, 0x167f5b, 0x1f5f9a, 0x2b2b2b] });
+    models.push({ kind: 'rickshaw', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 0.45, length: 2.7, width: 1.33, height: 1.75, speedFactor: 0.6, palette: [0x1f7a3a, 0x1f7a3a, 0x167f5b, 0x1f5f9a, 0x2b2b2b] });
   }
   // motorbike + rider (Honda CD-70)
   {
@@ -111,7 +113,7 @@ export function buildVehicleModels(): VehicleModel[] {
       box(0.1, 0.1, 0.45, -0.2, 1.3, 0.12, 0xd9d2c3),
     ];
     const lights = [col(new THREE.CircleGeometry(0.07, 10).translate(0, 0.98, 0.72), 0xfff4d6), box(0.1, 0.06, 0.02, 0, 0.82, -0.66, 0xff1a0a)];
-    models.push({ kind: 'bike', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), length: 1.95, width: 0.75, height: 1.8, speedFactor: 0.85, palette: [0xb3121b, 0xb3121b, 0xb3121b, 0x1a1a1a, 0x1f3f7a] });
+    models.push({ kind: 'bike', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 0.25, length: 1.95, width: 0.75, height: 1.8, speedFactor: 0.85, palette: [0xb3121b, 0xb3121b, 0xb3121b, 0x1a1a1a, 0x1f3f7a] });
   }
   // Suzuki pickup (Ravi / Bolan)
   {
@@ -128,7 +130,7 @@ export function buildVehicleModels(): VehicleModel[] {
       wheel(0.26, 0.16, 0.6, 1.05), wheel(0.26, 0.16, -0.6, 1.05), wheel(0.26, 0.16, 0.6, -1.1), wheel(0.26, 0.16, -0.6, -1.1),
     ];
     const lights = [box(0.2, 0.14, 0.02, 0.5, 0.75, 1.64, 0xfff4d6), box(0.2, 0.14, 0.02, -0.5, 0.75, 1.64, 0xfff4d6), box(0.14, 0.18, 0.02, 0.6, 0.7, -1.67, 0xff1a0a), box(0.14, 0.18, 0.02, -0.6, 0.7, -1.67, 0xff1a0a)];
-    models.push({ kind: 'pickup', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), length: L, width: W, height: 1.8, speedFactor: 0.85, palette: [0xf2f2f0, 0xf2f2f0, 0xdcdcdc, 0x2b4a7a] });
+    models.push({ kind: 'pickup', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 1.15, length: L, width: W, height: 1.8, speedFactor: 0.85, palette: [0xf2f2f0, 0xf2f2f0, 0xdcdcdc, 0x2b4a7a] });
   }
   for (const m of models) for (const g of [m.paint, m.fixed, m.lights]) g.computeVertexNormals();
   return models;

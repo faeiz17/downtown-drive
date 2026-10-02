@@ -6,6 +6,8 @@ export interface DriveInput {
   handbrake: boolean;
   horn: boolean;
   lookBack: boolean;
+  /** nitrous (hold) */
+  nitro?: boolean;
 }
 
 type Action = 'horn' | 'lights' | 'camera' | 'reset' | 'indLeft' | 'indRight' | 'hazard' | 'pause' | 'map';
@@ -14,7 +16,7 @@ export class Input {
   private keys = new Set<string>();
   private pressed = new Set<Action>();
   private padPrev: boolean[] = [];
-  readonly drive: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false, lookBack: false };
+  readonly drive: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false, lookBack: false, nitro: false };
   private kbSteer = 0;
   /** mouse orbit for the chase camera */
   mouseDX = 0;
@@ -47,7 +49,7 @@ export class Input {
   }
 
   private isGameKey(code: string): boolean {
-    return ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code);
+    return ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab'].includes(code);
   }
 
   private actionFor(code: string): Action | null {
@@ -84,7 +86,7 @@ export class Input {
     const d = this.drive;
     if (!this.enabled) {
       d.throttle = d.brake = d.steer = 0;
-      d.handbrake = d.horn = d.lookBack = false;
+      d.handbrake = d.horn = d.lookBack = d.nitro = false;
       return;
     }
     // keyboard
@@ -96,7 +98,7 @@ export class Input {
     const diff = target - this.kbSteer;
     this.kbSteer += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
     let throttle = up ? 1 : 0, brake = down ? 1 : 0, steer = this.kbSteer;
-    let handbrake = this.k('Space'), horn = this.k('KeyH'), lookBack = this.k('KeyB');
+    let handbrake = this.k('Space'), horn = this.k('KeyH'), lookBack = this.k('KeyB'), nitro = this.k('ShiftLeft', 'ShiftRight', 'KeyN');
 
     // gamepad (standard mapping)
     const pads = typeof navigator.getGamepads === 'function' ? navigator.getGamepads() : [];
@@ -115,6 +117,7 @@ export class Input {
       handbrake = handbrake || btn(5) || btn(0);
       horn = horn || btn(10) || btn(1);
       lookBack = lookBack || btn(11);
+      nitro = nitro || btn(2) || btn(4); // X / square, or LB
       const edge = (i: number, a: Action) => {
         if (btn(i) && !this.padPrev[i]) this.pressed.add(a);
       };
@@ -138,6 +141,7 @@ export class Input {
     d.handbrake = handbrake;
     d.horn = horn;
     d.lookBack = lookBack;
+    d.nitro = nitro;
   }
 
   consumeMouse(): [number, number] {

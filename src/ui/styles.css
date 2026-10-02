@@ -4,6 +4,7 @@
   --ink: #f4f1ea;
   --panel: rgba(12, 14, 18, 0.78);
   --font: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --hud-font: 'Avenir Next Condensed', 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0f; color: var(--ink); font-family: var(--font); }
@@ -19,28 +20,35 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0f; col
 .msg { font-size: 14px; opacity: .8; }
 
 /* ---------------- HUD ---------------- */
-.hud { position: absolute; inset: 0; pointer-events: none !important; font-family: var(--font); }
+.hud { position: absolute; inset: 0; pointer-events: none !important; font-family: var(--hud-font); }
 .hud * { pointer-events: none; }
-.hud-map { position: absolute; left: 22px; bottom: 22px; width: 220px; }
-.minimap { display: block; border-radius: 50%; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
-.hud-attrib { position: absolute; left: 0; right: 0; bottom: -16px; text-align: center; font-size: 9px; color: rgba(255,255,255,.75); text-shadow: 0 1px 2px #000; }
-.hud-dash { position: absolute; right: 18px; bottom: 14px; width: 250px; height: 250px; }
-.hud-speedo { position: absolute; inset: 0; }
-.hud-readout { position: absolute; left: 0; right: 0; top: 96px; text-align: center; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
-.hud-speed { font-size: 46px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-.hud-unit { font-size: 12px; opacity: .75; letter-spacing: 1px; }
-.hud-gear { margin: 6px auto 0; width: 44px; padding: 2px 0; border-radius: 6px; background: rgba(255,180,0,.92); color: #111; font-weight: 800; font-size: 16px; }
-.hud-gear.rev { background: #fff; }
-.hud-tells { position: absolute; left: 0; right: 0; bottom: 20px; display: flex; justify-content: center; gap: 12px; }
-.tell { font-size: 14px; font-weight: 700; color: rgba(255,255,255,.18); }
+.hud-map { position: absolute; left: 24px; bottom: 26px; width: 210px; }
+.minimap { display: block; border-radius: 50%; box-shadow: 0 6px 24px rgba(0,0,0,.5), 0 0 0 1.5px rgba(255,255,255,.35); }
+.hud-attrib { position: absolute; left: 0; right: 0; bottom: -16px; text-align: center; font: 9px var(--font); color: rgba(255,255,255,.7); text-shadow: 0 1px 2px #000; }
+.hud-dash { position: absolute; right: 22px; bottom: 10px; width: 300px; height: 300px; }
+.hud-gauge { position: absolute; inset: 0; }
+.hud-readout { position: absolute; left: 0; right: 0; top: 78px; text-align: center; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,.75); }
+.hud-gear { display: inline-block; min-width: 40px; padding: 1px 10px 2px; border: 2px solid rgba(255,255,255,.85); border-radius: 5px; font-size: 26px; font-weight: 700; font-style: italic; line-height: 1.1; transform: skewX(-8deg); }
+.hud-gear.shift { background: #ff2d2d; border-color: #ff2d2d; box-shadow: 0 0 22px rgba(255,45,45,.9); }
+.hud-gear.rev { background: #fff; color: #111; text-shadow: none; }
+.hud-speed { margin-top: 2px; font-size: 92px; font-weight: 700; font-style: italic; line-height: .95; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.hud-unit { font-size: 15px; font-weight: 600; letter-spacing: 4px; opacity: .8; margin-top: 2px; }
+.hud-nos { position: absolute; left: 0; right: 0; bottom: 30px; text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 3px; color: #7fe3ff; text-shadow: 0 0 10px rgba(53,214,255,.8); }
+.hud-tells { position: absolute; left: 0; right: 0; bottom: 52px; display: flex; justify-content: center; gap: 14px; }
+.tell { font: 700 13px var(--font); color: rgba(255,255,255,.16); }
 .tell.on { color: #3cff6a; text-shadow: 0 0 8px #3cff6a; }
 .tell-head.on { color: #7fc4ff; text-shadow: 0 0 8px #7fc4ff; }
 .tell-hb.on { color: #ff4a3a; text-shadow: 0 0 8px #ff4a3a; }
-.hud-clock { position: absolute; right: 24px; top: 18px; color: #fff; font-size: 20px; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,.8); font-variant-numeric: tabular-nums; }
-.hud-street { position: absolute; left: 50%; top: 22px; transform: translateX(-50%); padding: 6px 16px; border-radius: 4px; background: rgba(0,0,0,.45); color: #fff; font-size: 17px; font-weight: 700; letter-spacing: .5px; opacity: 0; transition: opacity .6s; white-space: nowrap; }
+.hud-scene { position: absolute; right: 26px; top: 18px; color: #fff; font-size: 17px; font-weight: 600; font-style: italic; letter-spacing: 3px; text-shadow: 0 2px 8px rgba(0,0,0,.8); opacity: .85; }
+.hud-street { position: absolute; left: 50%; top: 22px; transform: translateX(-50%) skewX(-8deg); padding: 5px 20px; background: rgba(0,0,0,.45); border-left: 3px solid #fff; color: #fff; font-size: 20px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; opacity: 0; transition: opacity .6s; white-space: nowrap; }
 .hud-street.show { opacity: 1; }
+.hud-drift { position: absolute; left: 50%; top: 84px; transform: translateX(-50%) skewX(-8deg); color: #fff; text-align: center; opacity: 0; transition: opacity .25s; text-shadow: 0 2px 12px rgba(0,0,0,.8); white-space: nowrap; }
+.hud-drift.show { opacity: 1; }
+.hud-drift-label { display: block; font-size: 15px; font-weight: 600; letter-spacing: 8px; color: #ffd23f; }
+.hud-drift-num { display: block; font-size: 54px; font-weight: 700; font-style: italic; line-height: 1; font-variant-numeric: tabular-nums; }
+.hud-drift.banked .hud-drift-num { color: #ffd23f; text-shadow: 0 0 24px rgba(255,210,63,.7); }
 .hud-fps { position: absolute; left: 12px; top: 10px; color: #b6ff9a; font: 12px/1.4 ui-monospace, Menlo, monospace; text-shadow: 0 1px 2px #000; white-space: pre; }
-.hud-toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 8px 18px; border-radius: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 15px; opacity: 0; transition: opacity .3s; }
+.hud-toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 8px 18px; border-radius: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 17px; letter-spacing: 1px; opacity: 0; transition: opacity .3s; }
 .hud-toast.show { opacity: 1; }
 
 /* ---------------- Menus ---------------- */

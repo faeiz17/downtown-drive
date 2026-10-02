@@ -1,4 +1,6 @@
-// Combined-slip tyre model (Pacejka "magic formula" shape on a friction ellipse), 185/60 R15 touring tyre.
+// Combined-slip tyre model (Pacejka "magic formula" shape on a friction ellipse), tuned for arcade handling:
+// lots of grip, a sharp response around centre, and a wide plateau past the peak so slides stay catchable and
+// drifting costs little speed.
 
 export interface TireForces {
   fx: number; // longitudinal (N, + forward)
@@ -8,19 +10,20 @@ export interface TireForces {
 }
 
 export const TIRE = {
-  B: 11, // stiffness
-  C: 1.65, // shape
-  peakSlip: 0.11, // slip at peak (for normalisation)
-  muRoad: 1.02,
-  muGrass: 0.62,
-  loadSens: 0.08, // μ drops with load (per kN above 3 kN)
+  B: 16, // stiffness: peak at a slip of ~0.13 (about 8° of slip angle)
+  C: 1.4, // shape: 81 % of peak grip is left in a full slide
+  peakSlip: 0.13, // slip at peak (for normalisation)
+  muRoad: 1.55,
+  muWet: 1.32, // rain: a little less grip, same character
+  muGrass: 0.95,
+  loadSens: 0.03, // μ drops with load (per kN above 4 kN)
 };
 
 const mf = (s: number) => Math.sin(TIRE.C * Math.atan(TIRE.B * s));
 
 /**
  * vLong / vLat = contact patch velocity in the wheel frame (m/s), omegaR = wheel surface speed (ω·R).
- * fz = normal load (N), mu = surface friction.
+ * fz = normal load (N), mu = surface friction, latScale = lateral grip multiplier (drift / handbrake).
  */
 export function tireForces(vLong: number, vLat: number, omegaR: number, fz: number, mu: number, radius: number, latScale = 1): TireForces {
   if (fz <= 0) return { fx: 0, fy: 0, slip: 0, dFxdOmega: 0 };
@@ -30,7 +33,7 @@ export function tireForces(vLong: number, vLat: number, omegaR: number, fz: numb
   // combined slip vector normalised by the peak
   const sx = kappa, sy = Math.atan(tanA) * 0.9;
   const s = Math.hypot(sx, sy);
-  const muEff = mu * (1 - TIRE.loadSens * Math.max(0, fz / 1000 - 3));
+  const muEff = mu * (1 - TIRE.loadSens * Math.max(0, fz / 1000 - 4));
   const fMax = muEff * fz;
   let fx = 0, fy = 0;
   if (s > 1e-6) {

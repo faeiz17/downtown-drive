@@ -1,10 +1,12 @@
-// 4G18 1.6 L engine + torque converter + 4-speed automatic (INVECS-II style) with P/R/N/D logic.
-// Published: 105 hp @ 6000 rpm, 150 Nm @ 4500 rpm, top speed 180 km/h (Pakistan-market GLX SR 1.6 AT).
+// Arcade drivetrain: a tuned 2.0 turbo four (about 410 hp) through a 6-speed sequential gearbox that shifts by itself,
+// all-wheel drive with a rear bias, launch slip, a bouncing rev limiter, turbo spool and nitrous.
+// This is deliberately NOT the stock 1.6 automatic: the game is tuned to feel like an arcade street racer.
 
-export type GearMode = 'P' | 'R' | 'N' | 'D';
+export type GearMode = 'R' | 'N' | 'D';
 
+/** Engine torque (Nm) at full boost. Peak 480 Nm at 5000 rpm, ~410 hp at 7000 rpm. */
 const TORQUE_CURVE: [number, number][] = [
-  [0, 0], [700, 95], [1000, 105], [2000, 122], [3000, 136], [4000, 147], [4500, 150], [5000, 146], [5500, 138], [6000, 125], [6500, 110], [7000, 90],
+  [0, 0], [900, 170], [2000, 250], [3000, 390], [4000, 465], [5000, 480], [6000, 465], [7000, 420], [7600, 385], [8200, 320],
 ];
 
 function curve(rpm: number): number {
@@ -19,24 +21,37 @@ function curve(rpm: number): number {
   return c[c.length - 1][1];
 }
 
+const RAD_TO_RPM = 60 / (2 * Math.PI);
+
 export class Drivetrain {
-  readonly ratios = [2.842, 1.529, 1.0, 0.712];
-  readonly reverseRatio = 2.48;
-  readonly finalDrive = 4.042;
-  readonly efficiency = 0.92;
-  readonly idle = 780;
-  readonly redline = 6500;
-  readonly limiter = 6700;
-  readonly stallRpm = 2700;
+  readonly ratios = [3.1, 2.05, 1.5, 1.17, 0.94, 0.73];
+  readonly reverseRatio = 3.0;
+  readonly finalDrive = 3.9;
+  readonly efficiency = 0.9;
+  readonly idle = 950;
+  readonly redline = 7600;
+  readonly limiter = 7900;
+  /** share of drive torque sent to the front axle (rear-biased AWD) */
+  readonly frontSplit = 0.34;
+  readonly launchRpm = 4700;
 
   mode: GearMode = 'D';
-  gear = 1; // 1..4 in D
-  rpm = 780;
+  gear = 1; // 1..6 in D
+  rpm = 950;
   shiftTimer = 0; // > 0 while a shift is in progress (torque cut)
   private shiftCooldown = 0;
   lastShift: 'up' | 'down' | null = null;
+  /** counts shifts so audio/HUD can react to each one */
+  shiftCount = 0;
   torqueOut = 0; // engine torque (Nm) last step, for audio load
   throttleEff = 0;
+  /** turbo spool 0..1 (lags the throttle) */
+  boost = 0;
+  /** true for a moment each time the limiter cuts */
+  limiting = false;
+  private limiterCut = 0;
+  /** nitrous: 1.0 = no nitrous */
+  nitroGain = 1;
 
   get ratio(): number {
     if (this.mode === 'R') return -this.reverseRatio;
@@ -45,77 +60,86 @@ export class Drivetrain {
   }
 
   get gearLabel(): string {
-    // Drive is fully automatic — the dash shows D, not a gear the player selects.
-    if (this.mode === 'D') return 'D';
+    if (this.mode === 'D') return String(this.gear);
     return this.mode;
   }
 
+  /** Road speed (m/s) at which gear g (1-based) reaches the given rpm. */
+  speedAt(g: number, rpm: number, wheelRadius: number): number {
+    return (rpm / RAD_TO_RPM / (this.ratios[g - 1] * this.finalDrive)) * wheelRadius;
+  }
+
   /**
-   * Advance the drivetrain. wheelOmega = mean angular velocity of the driven (front) wheels (rad/s, + forward).
-   * Returns the total drive torque at the driven axle (Nm, + = forward).
+   * Advance the drivetrain. wheelOmega = torque-weighted mean angular velocity of the driven wheels (rad/s, + forward).
+   * Returns the total drive torque at the wheels (Nm, + = forward); the caller splits it front/rear.
    */
-  step(dt: number, throttle: number, wheelOmega: number, speed: number): number {
+  step(dt: number, throttle: number, wheelOmega: number, speed: number, braking: boolean): number {
     const ratio = this.ratio;
-    const turbineRpm = Math.abs(wheelOmega * ratio * this.finalDrive) * (60 / (2 * Math.PI));
+    const overall = Math.abs(ratio * this.finalDrive);
+    const coupled = Math.abs(wheelOmega) * overall * RAD_TO_RPM;
     this.shiftTimer = Math.max(0, this.shiftTimer - dt);
     this.shiftCooldown = Math.max(0, this.shiftCooldown - dt);
 
-    // Automatic only. Shift on road speed so the converter can't make it hunt.
-    // Light throttle short-shifts; full throttle holds each gear a little longer.
+    // --- automatic sequential shifting on engine speed
     if (this.mode === 'D' && this.shiftCooldown <= 0) {
-      const kmh = Math.abs(speed) * 3.6;
-      const upAt = [0, 56, 106, 162]; // full-throttle upshift speeds (km/h); light throttle short-shifts at 70 %
-      const downAt = [0, 0, 24, 72, 130];
-      const up = upAt[this.gear] * (0.7 + 0.3 * throttle);
-      if (this.gear < 4 && (kmh > up || turbineRpm > 6100)) this.shift(this.gear + 1);
-      else if (this.gear > 1 && kmh < downAt[this.gear]) this.shift(this.gear - 1);
-      else if (this.gear > 1 && throttle > 0.9 && kmh < upAt[this.gear - 1] * 0.8 && turbineRpm < 4200) this.shift(this.gear - 1);
+      const g = this.gear;
+      const upAt = 3600 + (this.redline - 250 - 3600) * Math.min(1, throttle * 1.15);
+      if (g < this.ratios.length && coupled > upAt && throttle > 0.05) this.shift(g + 1);
+      else if (g > 1) {
+        const lower = (coupled * this.ratios[g - 2]) / this.ratios[g - 1]; // rpm after a downshift
+        // kick-down on full throttle, eager downshifts under braking (engine braking + the sound of it), lazy otherwise
+        const downBelow = throttle > 0.85 ? 6300 : braking ? 6600 : 3300;
+        const minRpm = throttle > 0.85 ? 5200 : braking ? 5600 : 2100;
+        if (lower < downBelow && coupled < minRpm) this.shift(g - 1);
+      }
     }
 
-    // reverse is limited like most games (and most sane drivers): throttle fades out above ~30 km/h
-    if (this.mode === 'R') throttle *= Math.max(0, Math.min(1, 1 - (Math.abs(speed) - 7.5) / 2));
+    // reverse is limited: throttle fades out above ~55 km/h
+    if (this.mode === 'R') throttle *= Math.max(0, Math.min(1, 1 - (Math.abs(speed) - 14) / 3));
 
-    // engine speed: torque converter lets the engine rise towards stall speed while the turbine is slow
+    // --- engine speed: locked to the wheels once they are fast enough, slipping clutch below that (launch)
     const inGear = this.mode === 'D' || this.mode === 'R';
-    const freeRev = this.idle + throttle * (inGear ? this.stallRpm - this.idle : this.limiter - this.idle);
-    // at full throttle the engine flares to the converter's stall speed and holds there while the turbine catches up;
-    // above that it runs a few percent ahead of the turbine (converter slip grows with throttle)
-    let target = inGear ? Math.max(turbineRpm * (1.03 + 0.07 * throttle) + 120 * throttle, freeRev, this.idle) : freeRev;
-    if (this.shiftTimer > 0) target = this.rpm; // hold during the shift
-    const rate = target > this.rpm ? 9 : 6;
+    const free = this.idle + throttle * ((inGear ? this.launchRpm : this.limiter) - this.idle);
+    let target = inGear ? Math.max(coupled, free) : free;
+    if (this.shiftTimer > 0) target = Math.max(coupled, this.idle); // revs fall/rise to the new gear during the shift
+    const rate = target > this.rpm ? 16 : this.shiftTimer > 0 ? 22 : 9;
     this.rpm += (target - this.rpm) * Math.min(1, rate * dt);
-    this.rpm = Math.max(this.idle * 0.95, Math.min(this.limiter, this.rpm));
+    this.rpm = Math.max(this.idle * 0.95, Math.min(this.limiter + 60, this.rpm));
 
-    // engine torque (limiter cuts fuel), engine braking off-throttle
-    let throttleEff = throttle;
-    if (this.rpm >= this.limiter - 20) throttleEff = 0;
+    // --- rev limiter: hard cut that bounces
+    this.limiterCut = Math.max(0, this.limiterCut - dt);
+    if (this.rpm >= this.limiter) this.limiterCut = 0.055;
+    this.limiting = this.limiterCut > 0;
+
+    // --- turbo: boost follows the throttle with a little lag, quicker at high rpm
+    const spoolTarget = throttle * Math.min(1, Math.max(0, (this.rpm - 1800) / 2200));
+    const spoolRate = spoolTarget > this.boost ? 3.2 + this.rpm / 2500 : 7;
+    this.boost += (spoolTarget - this.boost) * Math.min(1, spoolRate * dt);
+
+    // --- torque
+    const throttleEff = this.limiting ? 0 : throttle;
     this.throttleEff = throttleEff;
-    let tq = curve(this.rpm) * throttleEff;
-    if (throttleEff < 0.05) tq -= 18 * Math.min(1, (this.rpm - this.idle) / 3000);
+    let tq = curve(this.rpm) * throttleEff * (0.62 + 0.38 * this.boost) * this.nitroGain;
+    if (throttleEff < 0.05) tq -= (30 + this.rpm * 0.011) * Math.min(1, (this.rpm - this.idle) / 1500); // engine braking
     this.torqueOut = tq;
     if (!inGear) return 0;
-
-    // converter torque multiplication (up to 2.45× at stall), fully coupled above 85% speed ratio
-    const sr = Math.min(1, turbineRpm / Math.max(1, this.rpm));
-    const tr = sr < 0.85 ? 2.45 - (sr / 0.85) * 1.45 : 1.0;
-    const cut = this.shiftTimer > 0 ? 0.35 : 1;
-    let axle = tq * (tq > 0 ? tr : 1) * ratio * this.finalDrive * this.efficiency * cut;
-    // creep at idle in gear (automatic)
-    if (throttle < 0.05 && Math.abs(speed) < 2.5) axle += Math.sign(ratio) * 220 * (1 - Math.abs(speed) / 2.5);
-    return axle;
+    const cut = this.shiftTimer > 0 ? 0.15 : 1;
+    return tq * ratio * this.finalDrive * this.efficiency * cut;
   }
 
   private shift(to: number) {
     this.lastShift = to > this.gear ? 'up' : 'down';
     this.gear = to;
-    this.shiftTimer = 0.32;
-    this.shiftCooldown = 0.9;
+    this.shiftTimer = 0.11;
+    this.shiftCooldown = this.lastShift === 'up' ? 0.32 : 0.22;
+    this.shiftCount++;
   }
 
   setMode(m: GearMode) {
     if (m === this.mode) return;
     this.mode = m;
     if (m === 'D') this.gear = 1;
-    this.shiftTimer = 0.25;
+    this.shiftTimer = 0.12;
+    this.shiftCount++;
   }
 }

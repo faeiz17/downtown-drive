@@ -1,5 +1,8 @@
-// AI traffic on the OSM road graph: left-hand lanes, IDM car-following (incl. the player), timed signals at chowks,
-// give-way reservations at other junctions, spawn/despawn ring around the player, kinematic physics bodies.
+// AI traffic on the OSM road graph: lanes on the city's driving side, IDM car-following (incl. the player), timed
+// signals, give-way reservations at other junctions, spawn/despawn ring around the player.
+// Bodies are kinematic while the AI drives them. A car the player is about to hit is switched to a light dynamic
+// body just before contact, so it gets punted out of the way (arcade "traffic checking") instead of acting like a
+// wall; it stays a wreck for a few seconds and is then recycled.
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type { WorldData } from '../data/types';
@@ -37,6 +40,13 @@ class AIVehicle {
   age = 0;
   body: RAPIER.RigidBody | null = null;
   targetSpeedJitter = 1;
+  /** 0 = driven by the AI, 1 = armed (dynamic, about to be hit), 2 = wrecked (dynamic, free) */
+  wreck = 0;
+  wreckT = 0;
+  y = 0.02;
+  readonly q = new THREE.Quaternion();
+  /** last frame's position along the player's heading (near-miss detection) */
+  along = 0;
   constructor(model: number) {
     this.model = model;
   }
@@ -51,7 +61,14 @@ export interface PlayerInfo {
   hx: number;
   hz: number;
   speed: number;
+  /** ground velocity (m/s) */
+  vx: number;
+  vz: number;
 }
+
+/** traffic is deliberately light so hitting it costs speed but doesn't stop the car dead */
+const TRAFFIC_MASS = 430;
+const WRECK_SECONDS = 7;
 
 export class TrafficManager {
   readonly group = new THREE.Group();
@@ -71,6 +88,9 @@ export class TrafficManager {
   private lastSignalState = '';
   target = 45;
   onHonk: ((x: number, z: number, kind: string) => void) | null = null;
+  /** called when the player threads past a car at speed (closing speed in m/s) */
+  onNearMiss: ((closing: number) => void) | null = null;
+  private owners = new Map<number, AIVehicle>(); // collider handle → vehicle
   private m4 = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private s3 = new THREE.Vector3(1, 1, 1);
@@ -271,19 +291,62 @@ export class TrafficManager {
       pooled.setEnabled(true);
       pooled.setTranslation({ x: v.x, y: 0.02, z: v.z }, false);
       v.body = pooled;
+      this.owners.set(pooled.collider(0).handle, v);
       return;
     }
     const R = this.physics.R;
     const m = this.models[v.model];
-    const body = this.physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(v.x, 0, v.z));
-    const col = R.ColliderDesc.cuboid(m.width / 2, m.height / 2, m.length / 2).setTranslation(0, m.height / 2, 0).setCollisionGroups(groups(GROUP.TRAFFIC, GROUP.PLAYER)).setFriction(0.4);
-    this.physics.world.createCollider(col, body);
+    const body = this.physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(v.x, 0, v.z).setCcdEnabled(true));
+    // collides with the world too, which only matters once a car has been knocked loose (kinematic bodies ignore it)
+    const col = R.ColliderDesc.cuboid(m.width / 2, m.height / 2 - 0.12, m.length / 2).setTranslation(0, m.height / 2 + 0.12, 0)
+      .setCollisionGroups(groups(GROUP.TRAFFIC, GROUP.PLAYER | GROUP.STATIC | GROUP.TRAFFIC)).setFriction(0.5).setRestitution(0.2).setMass(TRAFFIC_MASS * m.massFactor);
+    const c = this.physics.world.createCollider(col, body);
     v.body = body;
+    this.owners.set(c.handle, v);
+  }
+
+  /** Switch a car to a dynamic body moving at its current speed (just before the player hits it). */
+  private arm(v: AIVehicle): void {
+    if (!this.physics || !v.body || v.wreck !== 0) return;
+    const R = this.physics.R;
+    v.body.setBodyType(R.RigidBodyType.Dynamic, true);
+    v.body.setLinvel({ x: v.hx * v.v, y: 0, z: v.hz * v.v }, true);
+    v.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    v.body.setLinearDamping(0.05);
+    v.body.setAngularDamping(0.4);
+    v.wreck = 1;
+    v.wreckT = 0;
+  }
+
+  private disarm(v: AIVehicle): void {
+    if (!this.physics || !v.body) return;
+    v.body.setBodyType(this.physics.R.RigidBodyType.KinematicPositionBased, true);
+    v.wreck = 0;
+    v.y = 0.02;
+  }
+
+  /** Contact between two colliders: if one is a traffic car, it becomes a wreck. @returns true if it was traffic */
+  impact(handle1: number, handle2: number): boolean {
+    const v = this.owners.get(handle1) ?? this.owners.get(handle2);
+    if (!v || !v.body) return false;
+    if (v.wreck === 0) this.arm(v);
+    if (v.wreck === 1) {
+      v.wreck = 2;
+      v.wreckT = 0;
+      v.body.setLinearDamping(0.7);
+      v.body.setAngularDamping(1.4);
+      if (v.reserved >= 0) this.occupancy.get(v.reserved)?.delete(v);
+      v.reserved = -1;
+    }
+    return true;
   }
 
   private removeVehicle(i: number): void {
     const v = this.vehicles[i];
     if (v.body) {
+      if (v.wreck) this.disarm(v);
+      this.owners.delete(v.body.collider(0).handle);
+      v.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, false);
       v.body.setEnabled(false);
       let pool = this.bodyPool.get(v.model);
       if (!pool) this.bodyPool.set(v.model, (pool = []));
@@ -303,6 +366,7 @@ export class TrafficManager {
       const model = this.pickModel();
       const v = new AIVehicle(model);
       this.createBody(v);
+      this.owners.delete(v.body!.collider(0).handle);
       v.body!.setEnabled(false);
       let pool = this.bodyPool.get(model);
       if (!pool) this.bodyPool.set(model, (pool = []));
@@ -388,11 +452,11 @@ export class TrafficManager {
       const lat = Math.abs(rx * me.hz - rz * me.hx);
       const width = (this.models[me.model].width + this.models[o.model].width) / 2 + 0.25;
       if (lat > width) continue;
-      if (o.hx * me.hx + o.hz * me.hz < 0.2) continue; // oncoming / crossing traffic handled by junction rules
+      if (o.wreck !== 2 && o.hx * me.hx + o.hz * me.hz < 0.2) continue; // oncoming / crossing traffic handled by junction rules
       const g = along - (myLen + this.models[o.model].length) / 2;
       if (g < gap) {
         gap = g;
-        lv = o.v;
+        lv = o.wreck === 2 ? 0 : o.v;
       }
     }
     // player car
@@ -430,13 +494,43 @@ export class TrafficManager {
     for (let i = this.vehicles.length - 1; i >= 0; i--) {
       const v = this.vehicles[i];
       v.age += dt;
-      if (Math.hypot(v.x - player.x, v.z - player.z) > 420 || (v.waiting > 40 && v.age > 60) || this.vehicles.length > this.target + 10) this.removeVehicle(i);
+      if (Math.hypot(v.x - player.x, v.z - player.z) > 420 || (v.waiting > 40 && v.age > 60) || this.vehicles.length > this.target + 10 || (v.wreck === 2 && v.wreckT > WRECK_SECONDS)) this.removeVehicle(i);
     }
     this.rebuildGrid();
 
     for (let i = 0; i < this.vehicles.length; i++) {
       const v = this.vehicles[i];
       const m = this.models[v.model];
+      // --- the player and this car: near misses, and switching to a dynamic body just before a hit
+      const pdx = v.x - player.x, pdz = v.z - player.z;
+      const pd = Math.hypot(pdx, pdz);
+      if (pd < 40 && v.wreck !== 2) {
+        const rvx = player.vx - v.hx * v.v, rvz = player.vz - v.hz * v.v;
+        const closing = (rvx * pdx + rvz * pdz) / (pd || 1);
+        if (v.wreck === 0 && closing > 5 && pd < 4.2 + closing * 0.17) this.arm(v);
+        const along = pdx * player.hx + pdz * player.hz;
+        if (v.along > 0 && along <= 0 && v.wreck === 0) {
+          const lat = Math.abs(pdx * player.hz - pdz * player.hx);
+          const rel = Math.hypot(rvx, rvz);
+          if (lat < 3.1 && rel > 14) this.onNearMiss?.(rel);
+        }
+        v.along = along;
+      } else v.along = 0;
+      if (v.wreck) {
+        v.wreckT += dt;
+        const t = v.body!.translation(), r = v.body!.rotation();
+        if (v.wreck === 2) {
+          // free body: follow the physics
+          v.x = t.x;
+          v.z = t.z;
+          v.y = t.y;
+          v.q.set(r.x, r.y, r.z, r.w);
+          v.v = 0;
+          if (t.y < -3) v.wreckT = WRECK_SECONDS + 1;
+          continue;
+        }
+        if (v.wreckT > 0.6) this.disarm(v); // the player missed: hand it back to the AI
+      }
       const vmax = (v.turning ? Math.min(v.lane.speed, 7.5) : v.lane.speed) * m.speedFactor * v.targetSpeedJitter;
       let { gap, v: lv, isPlayer } = this.leader(i, player);
       // junction ahead: signals / give way
@@ -512,15 +606,18 @@ export class TrafficManager {
     for (const v of this.vehicles) {
       const k = v.model;
       const idx = counts[k]++;
-      const yaw = Math.atan2(v.hx, v.hz);
-      this.q.setFromAxisAngle(up, yaw);
-      this.m4.compose(this.p3.set(v.x, 0.02, v.z), this.q, this.s3);
+      if (v.wreck === 2) this.m4.compose(this.p3.set(v.x, v.y, v.z), v.q, this.s3);
+      else {
+        const yaw = Math.atan2(v.hx, v.hz);
+        this.q.setFromAxisAngle(up, yaw);
+        this.m4.compose(this.p3.set(v.x, 0.02, v.z), this.q, this.s3);
+      }
       const ms = this.meshes[k];
       ms.paint.setMatrixAt(idx, this.m4);
       ms.fixed.setMatrixAt(idx, this.m4);
       ms.lights.setMatrixAt(idx, this.m4);
       ms.paint.setColorAt(idx, v.color);
-      if (v.body) {
+      if (v.body && v.wreck === 0) {
         v.body.setNextKinematicTranslation({ x: v.x, y: 0.02, z: v.z });
         v.body.setNextKinematicRotation({ x: this.q.x, y: this.q.y, z: this.q.z, w: this.q.w });
       }

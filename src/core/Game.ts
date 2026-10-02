@@ -68,6 +68,8 @@ export class Game {
   /** ?autopilot=<km/h>: follows the road network (benchmarks / attract mode) */
   autopilotKmh = parseFloat(new URLSearchParams(location.search).get('autopilot') ?? '0');
   private autopilotStuck = 0;
+  /** shown top-right on the HUD, e.g. "NIGHT · RAIN" */
+  sceneLabel = '';
   /** debug switch for scripts/test-smoothness.ts: false renders the raw latest physics state */
   interpolate = true;
 
@@ -332,7 +334,7 @@ export class Game {
     if (running) {
       this.accumulator += dt;
       let steps = 0;
-      const drive = this.mode === 'play' ? this.input.drive : { throttle: 0, brake: 0, steer: 0, handbrake: true, horn: false, lookBack: false };
+      const drive = this.mode === 'play' ? this.input.drive : { throttle: 0, brake: 0, steer: 0, handbrake: true, horn: false, lookBack: false, nitro: false };
       while (this.accumulator >= this.physics.dt && steps < 10) {
         car.physicsStep(this.physics.dt, drive);
         this.physics.step();
@@ -344,7 +346,12 @@ export class Game {
       // impacts (player chassis vs world/traffic)
       this.impactCd -= dt;
       let maxF = 0;
-      for (const im of this.physics.impacts) maxF = Math.max(maxF, im.force);
+      let hitTraffic = false;
+      for (const im of this.physics.impacts) {
+        maxF = Math.max(maxF, im.force);
+        if (this.traffic.impact(im.handle1, im.handle2)) hitTraffic = true;
+      }
+      void hitTraffic;
       this.physics.impacts.length = 0;
       if (maxF > 8000 && this.impactCd <= 0) {
         const s = Math.min(1, maxF / 90000);
@@ -386,7 +393,7 @@ export class Game {
       const [mx, my] = this.input.consumeMouse();
       const sx = this.settings.invertCameraX ? -1 : 1;
       this.rig.orbit(mx * sx, my);
-      this.rig.update(dt, { position: carPos, quaternion: car.object.quaternion, velocity: v.velocity, speed: v.speed, lateralG: v.lateralG, longG: v.longG }, this.input.drive.lookBack);
+      this.rig.update(dt, { position: carPos, quaternion: car.object.quaternion, velocity: v.velocity, speed: v.speed, lateralG: v.lateralG, longG: v.longG, boost: v.boostFx, drift: v.drift }, this.input.drive.lookBack);
     }
 
     P.end();
@@ -406,7 +413,7 @@ export class Game {
       P.end();
       P.begin('traffic');
       const camFwd = this.camera.getWorldDirection(this.scratchFwd);
-      this.traffic.update(dt, { x: v.position.x, z: v.position.z, hx: Math.sin(v.heading), hz: Math.cos(v.heading), speed: v.speed }, this.camera.position.x, this.camera.position.z, camFwd.x, camFwd.z);
+      this.traffic.update(dt, { x: v.position.x, z: v.position.z, hx: Math.sin(v.heading), hz: Math.cos(v.heading), speed: v.speed, vx: v.velocity.x, vz: v.velocity.z }, this.camera.position.x, this.camera.position.z, camFwd.x, camFwd.z);
       this.traffic.sync(night);
       P.end();
     }
@@ -415,13 +422,17 @@ export class Game {
     // ---- HUD + audio
     if (this.mode === 'play') {
       P.begin('hud');
-      this.telemetry.maxKmh = Math.max(this.telemetry.maxKmh, v.kmh);
+      this.telemetry.maxKmh = Math.max(this.telemetry.maxKmh, v.groundKmh);
+      // on its roof or side for a moment: put it back on the road
+      if (v.flipped > 1.4) this.resetCar();
       this.telemetry.distance += Math.abs(v.speed) * dt;
       const L = car.visual.lights;
       const blink = car.visual.blinkPhase;
       this.hud.update(dt, {
-        kmh: v.kmh, rpm: v.drivetrain.rpm, gear: v.drivetrain.gearLabel, indicatorLeft: L.indicatorLeft, indicatorRight: L.indicatorRight, blink,
-        headlights: car.headlightsOn, handbrake: v.handbrake, hour: this.dayNight.hour, street: this.street, units: this.settings.units,
+        kmh: v.groundKmh, rpm: v.drivetrain.rpm, redline: v.drivetrain.redline, gear: v.drivetrain.gearLabel, nitro: v.nitro, nitroActive: v.nitroActive,
+        driftScore: v.driftScore, driftBanked: v.driftBanked, driftBankedCount: v.driftBankedCount,
+        indicatorLeft: L.indicatorLeft, indicatorRight: L.indicatorRight, blink,
+        headlights: car.headlightsOn, handbrake: v.handbrake, scene: this.sceneLabel, street: this.street, units: this.settings.units,
         x: carPos.x, z: carPos.z, heading: v.heading, camera: this.rig.mode,
       }, this.traffic.positions());
       P.end();
