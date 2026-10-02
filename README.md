@@ -1,6 +1,10 @@
-# Gulberg Drive
+# Downtown Drive
 
-A browser driving game: a Mitsubishi Lancer GLX (plate DAK 539) on a map of Gulberg, Lahore, built from OpenStreetMap.
+An arcade street-racing game in the browser: a tuned Mitsubishi Lancer (plate DAK 539) through downtown Los Angeles, built from OpenStreetMap. Arcade handling (AWD turbo, drifting, nitrous, knockable traffic), pick-a-time-of-day (dawn / day / afternoon / evening / night) with optional rain.
+
+> The sections below still describe the earlier Gulberg, Lahore build in places. The map is now `data/osm/dtla.overpass.json` → `public/world/city.world.json` (`npm run build:world`), traffic drives on the right (`DRIVE_SIDE` in `src/data/geo.ts`).
+
+**Audio credits (all CC0, Freesound):** engine loops from #496171 *editboy23*; tyre squeal #71739 *audible-edge*; backfire #105351 *CeebFrack*; nitrous #404333 *strexet*; rain #156994 *chrscrwfrd18*; thunder #581125 *Fission9*. Sky HDRIs: Poly Haven (CC0).
 
 ## Setup
 

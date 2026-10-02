@@ -20,6 +20,7 @@ import { Input } from './Input';
 import { saveSettings, SCENE_HOURS, type Settings } from './Settings';
 import { isMajor } from '../data/roadClasses';
 import { leftNormal } from './geom2d';
+import { DRIVE_SIDE } from '../data/geo';
 import { Profiler } from './Profiler';
 import { FramePacer } from './FramePacer';
 
@@ -261,7 +262,7 @@ export class Game {
     }
     const [lx, lz] = leftNormal(tx, tz);
     const off = e.oneway ? e.width / 2 - 1.8 : Math.min(e.width / 4, 2.2) + (e.median ?? 0) / 2;
-    v.reset(r.x + lx * off, r.z + lz * off, Math.atan2(tx, tz));
+    v.reset(r.x + lx * off * DRIVE_SIDE, r.z + lz * off * DRIVE_SIDE, Math.atan2(tx, tz));
     this.rig.snap();
     this.hud.toast('Car reset');
   }
@@ -515,7 +516,7 @@ export class Game {
     }
     const [lx, lz] = leftNormal(tx, tz);
     const off = e.oneway ? e.width / 2 - 1.7 : Math.min(e.width / 4, 2.2) + (e.median ?? 0) / 2;
-    const gx = r.x + lx * off + tx * 4 - v.position.x, gz = r.z + lz * off + tz * 4 - v.position.z;
+    const gx = r.x + lx * off * DRIVE_SIDE + tx * 4 - v.position.x, gz = r.z + lz * off * DRIVE_SIDE + tz * 4 - v.position.z;
     let err = Math.atan2(gx, gz) - h;
     err = Math.atan2(Math.sin(err), Math.cos(err));
     d.steer = Math.max(-1, Math.min(1, -err * 2.2));

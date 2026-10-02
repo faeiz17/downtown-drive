@@ -7,10 +7,10 @@
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ORIGIN, EXTENT, project } from '../src/data/geo';
+import { ORIGIN, EXTENT } from '../src/data/geo';
 import type { WorldData, Shop } from '../src/data/types';
 import { PLOT_STRIDE, TREE_STRIDE, LAMP_STRIDE, POLE_STRIDE, BILLBOARD_STRIDE } from '../src/data/types';
-import { cumulative, sampleAt, closestOnPolyline, leftNormal, centroid } from '../src/core/geom2d';
+import { cumulative, sampleAt, leftNormal } from '../src/core/geom2d';
 import { ROAD_CLASSES } from '../src/data/roadClasses';
 import { OSM_CACHE, readOsmCache, fetchOsm } from './fetch-osm';
 import { parseOsm, displayName, inExtent } from './world/osm';
@@ -22,7 +22,7 @@ import { buildPlots } from './world/infill';
 import { placeBillboards, placeTrees, placeLamps, placePoles } from './world/props';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const WORLD_OUT = resolve(ROOT, 'public/world/gulberg.world.json');
+export const WORLD_OUT = resolve(ROOT, 'public/world/city.world.json');
 
 export async function buildWorld(): Promise<void> {
   const t0 = Date.now();
@@ -104,12 +104,8 @@ export async function buildWorld(): Promise<void> {
   const spawn = computeSpawn(net, buildings);
 
   // --- validation ------------------------------------------------------------------------------------------
-  const roadNames = new Set(net.edges.map((e) => e.name ?? ''));
-  const hasRoad = (re: RegExp) => [...roadNames].some((n) => re.test(n));
   const problems: string[] = [];
-  if (!hasRoad(/main boulevard gulberg/i)) problems.push('Main Boulevard Gulberg road missing');
-  if (!hasRoad(/m\.?\s?m\.?\s?alam/i)) problems.push('MM Alam Road missing');
-  for (const lm of ['Liberty', 'Kalma', 'Hussain']) if (!landmarks.some((l) => new RegExp(lm, 'i').test(l.name))) problems.push(`${lm} Chowk landmark missing`);
+  if (net.edges.length < 500) problems.push('too few roads');
   if (problems.length) throw new Error('World validation failed: ' + problems.join('; '));
 
   const stats = {
@@ -168,25 +164,25 @@ export async function buildWorld(): Promise<void> {
   void PLOT_STRIDE;
 }
 
-function computeSpawn(net: ReturnType<typeof buildRoads>, buildings: { name?: string; pts: number[] }[]) {
-  const tower = buildings.find((b) => /mega tower/i.test(b.name ?? ''));
-  // OSM Mega Tower, 63-B Main Boulevard Gulberg, beside KFC. Fallback is that footprint's centroid.
-  const [ax, az] = tower ? centroid(tower.pts) : project(31.52766, 74.34945);
-  let best: { st: (typeof net.strokes)[number]; s: number; d: number } | null = null;
+function computeSpawn(net: ReturnType<typeof buildRoads>, _buildings: unknown) {
+  // the longest straight two-way major street near the middle of the map, right-hand lane
+  let best: { st: (typeof net.strokes)[number]; score: number } | null = null;
   for (const st of net.strokes) {
-    if (!/main boulevard gulberg/i.test(st.name ?? '')) continue;
-    const c = closestOnPolyline(st.pts, ax, az);
-    if (c.d > 80) continue;
-    if (!best || c.d < best.d) best = { st, s: c.s, d: c.d };
+    if (!['primary', 'secondary', 'tertiary', 'trunk'].includes(st.cls) || st.pts.length < 6) continue;
+    const cum = cumulative(st.pts);
+    const L = cum[cum.length - 1];
+    const mid = sampleAt(st.pts, cum, L / 2);
+    const d = Math.hypot(mid.x, mid.z);
+    const score = Math.min(L, 400) - d * 0.8;
+    if (L > 160 && (!best || score > best.score)) best = { st, score };
   }
-  if (!best) return { x: round1(ax), z: round1(az + 20), heading: 0 };
+  if (!best) return { x: 0, z: 0, heading: 0 };
   const cum = cumulative(best.st.pts);
-  const L = cum[cum.length - 1];
-  const p = sampleAt(best.st.pts, cum, Math.min(L - 8, Math.max(8, best.s)));
+  const p = sampleAt(best.st.pts, cum, cum[cum.length - 1] * 0.3);
   const laneW = ROAD_CLASSES[best.st.cls].laneWidth;
   const off = best.st.oneway ? best.st.width / 2 - laneW / 2 - 0.3 : laneW / 2 + (best.st.median ?? 0) / 2;
   const [lx, lz] = leftNormal(p.tx, p.tz);
-  return { x: round1(p.x + lx * off), z: round1(p.z + lz * off), heading: Math.round(Math.atan2(p.tx, p.tz) * 1000) / 1000 };
+  return { x: round1(p.x - lx * off), z: round1(p.z - lz * off), heading: Math.round(Math.atan2(p.tx, p.tz) * 1000) / 1000 };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

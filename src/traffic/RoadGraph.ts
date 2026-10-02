@@ -2,6 +2,7 @@
 import type { WorldData, RoadEdge } from '../data/types';
 import { ROAD_CLASSES } from '../data/roadClasses';
 import { cumulative, offsetPolyline, sampleAt, SpatialGrid } from '../core/geom2d';
+import { DRIVE_SIDE } from '../data/geo';
 import { subPolyline } from '../world/roadGeom';
 
 export interface Lane {
@@ -60,7 +61,7 @@ export class RoadGraph {
     const lw = e.oneway ? e.width / n : Math.min(ROAD_CLASSES[e.cls].laneWidth, (e.width - (e.median ?? 0)) / (e.lanesF + e.lanesB));
     // offset to the LEFT of travel (left-hand traffic); lane 0 is the kerb lane
     const off = e.oneway ? (n / 2 - lane - 0.5) * lw : (e.median ?? 0) / 2 + lw * (n - lane - 0.5);
-    const offPts = offsetPolyline(pts, off);
+    const offPts = offsetPolyline(pts, off * DRIVE_SIDE);
     const cum = cumulative(offPts);
     const L = cum[cum.length - 1];
     const fromNode = dir === 1 ? e.a : e.b, toNode = dir === 1 ? e.b : e.a;

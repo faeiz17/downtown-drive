@@ -2,7 +2,7 @@
 import type { QualityName } from '../render/Quality';
 
 export type SceneName = 'dawn' | 'day' | 'afternoon' | 'evening' | 'night';
-export const SCENE_HOURS: Record<SceneName, number> = { dawn: 6.05, day: 12, afternoon: 16, evening: 18.45, night: 22 };
+export const SCENE_HOURS: Record<SceneName, number> = { dawn: 6.95, day: 12.5, afternoon: 16.2, evening: 18.65, night: 22 };
 
 export interface Settings {
   quality: QualityName;

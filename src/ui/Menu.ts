@@ -41,9 +41,9 @@ export class Menu {
     this.root.innerHTML = `
       <div class="menu main">
         <div class="brand">
-          <div class="brand-top">GULBERG</div>
+          <div class="brand-top">DOWNTOWN</div>
           <div class="brand-bottom">DRIVE</div>
-          <div class="brand-sub">Lahore · Mitsubishi Lancer GLX · DAK 539</div>
+          <div class="brand-sub">Los Angeles · Mitsubishi Lancer · DAK 539</div>
         </div>
         <div class="menu-buttons">
           <button data-a="play" class="primary">Play</button>

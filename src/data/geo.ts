@@ -2,12 +2,12 @@
 // Coordinate system used everywhere in the game: X = east, Y = up, Z = south (so north is -Z), metres.
 
 export const BBOX = {
-  // Requested box was 31.500–31.535 / 74.330–74.365. Kalma Chowk (31.5048, 74.3317) sat only
-  // ~150 m inside the west edge, so the box was widened south/west and trimmed east (see README).
-  south: 31.498,
-  west: 74.325,
-  north: 31.535,
-  east: 74.362,
+  // Downtown Los Angeles: the financial district, Bunker Hill, Staples Center / L.A. Live, the 110 and 101 freeways'
+  // surface streets. Dense real footprints (about 5,000 buildings, most with tagged heights) and a proper street grid.
+  south: 34.031,
+  west: -118.274,
+  north: 34.063,
+  east: -118.230,
 } as const;
 
 export const ORIGIN = {
@@ -36,13 +36,10 @@ export const EXTENT = (() => {
 })();
 
 /** Lahore, for solar position. */
-export const LAHORE = { lat: 31.52, lon: 74.35, utcOffsetHours: 5 } as const;
+export const LAHORE = { lat: 34.047, lon: -118.252, utcOffsetHours: -7 } as const; // Los Angeles (name kept: solar position)
+
+/** +1 drives on the left (Pakistan), −1 on the right (USA). Lane offsets and kerb-side props follow it. */
+export const DRIVE_SIDE = -1;
 
 /** Landmarks the data pipeline must find (validated by fetch-osm and build-world). */
-export const REQUIRED_LANDMARKS = [
-  { name: 'Main Boulevard Gulberg', kind: 'road' },
-  { name: 'MM Alam Road', kind: 'road' },
-  { name: 'Liberty Chowk', kind: 'place' },
-  { name: 'Kalma Chowk', kind: 'place' },
-  { name: 'Hussain Chowk', kind: 'place' },
-] as const;
+export const REQUIRED_LANDMARKS = [] as readonly { name: string; kind: string }[];

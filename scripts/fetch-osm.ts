@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { BBOX, REQUIRED_LANDMARKS } from '../src/data/geo';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const OSM_CACHE = resolve(ROOT, 'data/osm/gulberg.overpass.json');
+export const OSM_CACHE = resolve(ROOT, 'data/osm/dtla.overpass.json');
 
 const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',

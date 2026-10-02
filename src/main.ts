@@ -18,7 +18,7 @@ async function boot() {
     await runCarViewer(canvas);
     return;
   }
-  ui.innerHTML = `<div class="loading"><div class="loading-title">GULBERG DRIVE</div><div class="bar"><div class="fill"></div></div><div class="msg">Loading…</div></div>`;
+  ui.innerHTML = `<div class="loading"><div class="loading-title">DOWNTOWN DRIVE</div><div class="bar"><div class="fill"></div></div><div class="msg">Loading…</div></div>`;
   const fill = ui.querySelector('.fill') as HTMLElement;
   const msg = ui.querySelector('.msg') as HTMLElement;
   const progress = (p: number, m: string) => {
@@ -28,7 +28,7 @@ async function boot() {
   progress(0.05, 'Loading map data (© OpenStreetMap contributors)…');
   const [R, data] = await Promise.all([
     initRapier(),
-    fetch(`${import.meta.env.BASE_URL}world/gulberg.world.json`).then((r) => {
+    fetch(`${import.meta.env.BASE_URL}world/city.world.json`).then((r) => {
       if (!r.ok) throw new Error(`world data missing (${r.status}) – run "npm run build:world"`);
       return r.json() as Promise<WorldData>;
     }),

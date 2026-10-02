@@ -9,6 +9,7 @@ import type { WorldData } from '../data/types';
 import { ROAD_CLASSES } from '../data/roadClasses';
 import { RNG } from '../core/rng';
 import { cumulative, sampleAt, SpatialGrid, leftNormal } from '../core/geom2d';
+import { DRIVE_SIDE } from '../data/geo';
 import { RoadGraph, type Lane } from './RoadGraph';
 import { buildVehicleModels, KIND_WEIGHTS, type VehicleModel } from './models';
 import { PhysicsWorld, GROUP, groups } from '../physics/PhysicsWorld';
@@ -155,7 +156,7 @@ export class TrafficManager {
         const tx = sp.tx * arrivingDir, tz = sp.tz * arrivingDir;
         const [lx, lz] = leftNormal(tx, tz);
         const off = e.width / 2 + 0.7;
-        const px = sp.x + lx * off, pz = sp.z + lz * off;
+        const px = sp.x + lx * off * DRIVE_SIDE, pz = sp.z + lz * off * DRIVE_SIDE;
         const yaw = Math.atan2(-tx, -tz); // head faces oncoming traffic
         poles.push(px, pz, yaw);
         const group = this.approachGroup(n.signal, tx, tz);
