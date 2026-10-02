@@ -45,6 +45,7 @@ export class HUD {
   private g: CanvasRenderingContext2D;
   private face: HTMLCanvasElement; // static dial face, drawn once
   private gearEl: HTMLDivElement;
+  private boostEl: HTMLDivElement;
   private speedEl: HTMLDivElement;
   private unitEl: HTMLDivElement;
   private sceneEl: HTMLDivElement;
@@ -68,6 +69,7 @@ export class HUD {
     this.root = document.createElement('div');
     this.root.className = 'hud';
     this.root.innerHTML = `
+      <div class="hud-boostfx"></div>
       <div class="hud-street"></div>
       <div class="hud-drift"><span class="hud-drift-label">DRIFT</span><span class="hud-drift-num">0</span></div>
       <div class="hud-map"><div class="hud-attrib">© OpenStreetMap contributors</div></div>
@@ -98,6 +100,7 @@ export class HUD {
     this.face.width = this.face.height = SIZE * this.dpr;
     this.drawFace();
     this.gearEl = this.root.querySelector('.hud-gear') as HTMLDivElement;
+    this.boostEl = this.root.querySelector('.hud-boostfx') as HTMLDivElement;
     this.speedEl = this.root.querySelector('.hud-speed') as HTMLDivElement;
     this.unitEl = this.root.querySelector('.hud-unit') as HTMLDivElement;
     this.sceneEl = this.root.querySelector('.hud-scene') as HTMLDivElement;
@@ -144,6 +147,7 @@ export class HUD {
       this.gearEl.textContent = s.gear;
       this.lastGear = s.gear;
     }
+    this.boostEl.style.opacity = String(s.nitroActive ? 1 : 0);
     this.gearEl.classList.toggle('shift', s.rpm > s.redline - 250 && s.gear !== 'R');
     this.gearEl.classList.toggle('rev', s.gear === 'R');
     this.tell.left.classList.toggle('on', s.indicatorLeft && s.blink);

@@ -1,7 +1,7 @@
 // Edit the base Lancer CS mesh into the owner's car (docs/car-reference.md):
 //  • dark-blue metallic paint, beige interior converted to right-hand drive, steering wheel split onto its own pivot
 //  • roof rack and fog lamps removed, stock tail-light internals replaced by chrome "Altezza" twin-round units
-//  • black trunk wing, glass sunroof, smoked door visors, mud flaps, Punjab plates, GLX / TEXAS EDITION badges
+//  • body-colour ducktail spoiler, glass sunroof, smoked door visors, mud flaps, Punjab plates, GLX / TEXAS EDITION badges
 //  • 15" satin-black cross-spoke wheels with Dunlop SP Touring tyres (blue lettering), separate light nodes
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -355,30 +355,27 @@ export async function buildLancerNodes(log = console.log): Promise<{ nodes: Node
     info.badges = lancer;
   }
 
-  // --- trunk wing (gloss black, raised end plates) ---------------------------------------------------------------------
-  const spoiler = new Part('Spoiler', 'BlackGloss');
+  // --- ducktail spoiler (body colour, kicked-up lip across the trunk edge, no stilts) ------------------------------------
+  const spoiler = new Part('Spoiler', 'Paint');
   {
     const deck = (x: number, z: number) => cast(exterior, [x, 3, z], [0, -1, 0])!.p.y;
-    const zLead = -2.0, chord = 0.19, halfW = 0.6;
-    const y0 = deck(0, zLead - 0.09) + 0.03;
-    const prof = new THREE.Shape();
+    const zLead = -1.93, chord = 0.2, halfW = 0.38; // tail lamps start at |x| = 0.46: the lip stays clear of them
+    const prof = new THREE.Shape(); // side profile, s = distance rearwards, y = height above the lid
     prof.moveTo(0, 0);
-    prof.bezierCurveTo(0.06, 0.028, 0.15, 0.03, chord, 0.016);
-    prof.lineTo(chord, 0.002);
-    prof.bezierCurveTo(0.15, 0.012, 0.06, 0.01, 0, 0);
-    const wing = new THREE.ExtrudeGeometry(prof, { depth: halfW * 2, bevelEnabled: false, steps: 28, curveSegments: 10 });
-    const wp = wing.getAttribute('position') as THREE.BufferAttribute;
-    for (let i = 0; i < wp.count; i++) {
-      const s = wp.getX(i), yy = wp.getY(i), x = wp.getZ(i) - halfW;
-      const lift = Math.pow(Math.max(0, Math.abs(x) - halfW * 0.78) / (halfW * 0.22), 2) * 0.035;
-      wp.setXYZ(i, x, y0 + yy + lift, zLead - s);
+    prof.bezierCurveTo(0.07, 0.004, 0.14, 0.02, chord, 0.072); // sweeps up into the lip
+    prof.lineTo(chord + 0.004, 0.066);
+    prof.lineTo(chord - 0.01, 0.0);
+    prof.lineTo(0, -0.01);
+    const duck = new THREE.ExtrudeGeometry(prof, { depth: halfW * 2, bevelEnabled: false, steps: 32, curveSegments: 12 });
+    const dp = duck.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < dp.count; i++) {
+      const sx = dp.getX(i), yy = dp.getY(i), x = dp.getZ(i) - halfW;
+      const taper = 1 - Math.pow(Math.abs(x) / halfW, 3) * 0.55; // lip fades out towards the corners
+      const z = zLead - sx;
+      dp.setXYZ(i, x, deck(Math.max(-halfW * 0.92, Math.min(halfW * 0.92, x)), z) + 0.012 + yy * (yy > 0 ? taper : 1), z);
     }
-    wing.computeVertexNormals();
-    spoiler.addGeometry(wing);
-    for (const x of [-0.5, 0.5]) {
-      const base = deck(x, zLead - 0.09);
-      spoiler.addGeometry(new RoundedBoxGeometry(0.05, Math.max(0.02, y0 - base + 0.012), 0.14, 2, 0.01).translate(x, (y0 + base) / 2, zLead - 0.09));
-    }
+    duck.computeVertexNormals();
+    spoiler.addGeometry(duck);
   }
 
   // --- glass sunroof -----------------------------------------------------------------------------------------------------

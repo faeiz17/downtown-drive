@@ -5,6 +5,7 @@ import { Renderer } from '../render/Renderer';
 import { DayNight } from '../render/DayNight';
 import { SunShadows } from '../render/SunShadows';
 import { Rain } from '../render/Rain';
+import { WetReflection } from '../render/WetReflection';
 import { NightLights } from '../render/NightLights';
 import { QUALITY, type QualityPreset } from '../render/Quality';
 import { World } from '../world/World';
@@ -33,6 +34,7 @@ export class Game {
   readonly dayNight: DayNight;
   readonly shadows: SunShadows;
   readonly rainFx: Rain;
+  readonly wetFx: WetReflection;
   /** soft cool light that follows the car after dark (constant light count: no shader recompiles) */
   private readonly carFill: THREE.PointLight;
   readonly physics: PhysicsWorld;
@@ -89,6 +91,8 @@ export class Game {
     this.shadows = new SunShadows(this.scene, this.camera);
     this.dayNight = new DayNight(this.scene, this.renderer.renderer, this.shadows);
     this.rainFx = new Rain(this.scene);
+    this.wetFx = new WetReflection(this.renderer.renderer, this.scene, this.camera);
+    this.wetFx.hide = [this.rainFx.mesh];
     this.carFill = new THREE.PointLight(0xa9c2ff, 0, 9, 2);
     this.scene.add(this.carFill);
     this.world = new World(data, this.physics);
@@ -489,8 +493,9 @@ export class Game {
     // ---- render
     this.shadows.update();
     this.renderer.exposure = this.dayNight.exposure;
-    const blur = this.mode === 'play' && (this.rig.mode === 'chase' || this.rig.mode === 'far') ? Math.min(1, Math.max(0, (v.kmh - 50) / 120)) * 0.6 : 0;
+    const blur = this.mode === 'play' && (this.rig.mode === 'chase' || this.rig.mode === 'far') ? Math.min(1, Math.max(0, Math.max((v.groundKmh - 50) / 120, v.boostFx * 1.3))) * 0.8 : 0;
     P.begin('render');
+    this.wetFx.render(this.quality.reflections ? this.wet : 0, dt);
     this.renderer.render(dt, blur);
     P.end();
     this.frameMs = performance.now() - t0;

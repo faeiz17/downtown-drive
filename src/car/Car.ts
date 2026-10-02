@@ -71,6 +71,7 @@ export class Car {
     L.reverse = v.reversing;
     L.indicatorLeft = this.indicator === 'left' || this.indicator === 'hazard';
     L.indicatorRight = this.indicator === 'right' || this.indicator === 'hazard';
+    this.visual.boost = v.boostFx;
     this.visual.update(dt);
   }
 }

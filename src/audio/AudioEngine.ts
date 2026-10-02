@@ -64,6 +64,7 @@ export class AudioEngine {
   private thunder: AudioBuffer | null = null;
   private nextThunder = 12;
   private squealLevel = 0;
+  private windBoost = 0;
   private road: NoiseVoice;
   private wind: NoiseVoice;
   private spray: NoiseVoice;
@@ -222,9 +223,11 @@ export class AudioEngine {
     // road roar (tyres on tarmac / grass), wind, and spray thrown up on a wet road
     ramp(this.road.gain.gain, Math.min(0.55, e.speed / 55) * (e.surfaceGrass ? 0.9 : 0.4));
     ramp(this.road.filter.frequency, e.surfaceGrass ? 900 : 260 + e.speed * 7);
-    const w = Math.min(1, e.speed / 85);
-    ramp(this.wind.gain.gain, w * w * 0.5 * (e.interior ? 0.5 : 1));
-    ramp(this.wind.filter.frequency, 500 + w * 1500);
+    this.windBoost += ((e.nitro ? 1 : 0) - this.windBoost) * Math.min(1, dt * 4);
+    const w = Math.min(1, e.speed / 85 + this.windBoost * 0.25);
+    ramp(this.wind.gain.gain, (w * w * 0.7 + this.windBoost * 0.3 * w) * (e.interior ? 0.55 : 1));
+    ramp(this.wind.filter.frequency, 380 + w * 1900 + this.windBoost * 500);
+    ramp(this.wind.filter.Q.value !== undefined ? this.wind.filter.Q : this.wind.filter.Q, 0.5 + this.windBoost * 0.6, 0.2);
     ramp(this.spray.gain.gain, env.wet * (Math.min(1, e.speed / 45) * 0.11 + this.squealLevel * 0.2) * out);
     ramp(this.spray.filter.frequency, 1800 + Math.min(1, e.speed / 60) * 2600);
     // horn

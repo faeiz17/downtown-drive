@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { WorldAtlas, noise } from './atlas';
 import { RNG } from '../core/rng';
+import { wetUniforms } from '../render/WetReflection';
 
 /** MeshStandardMaterial that samples textures from an atlas cell per vertex (repeating inside the cell). */
 export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMaterial {
@@ -94,6 +95,35 @@ export function createAsphaltMaterial(): THREE.MeshStandardMaterial {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 8;
   const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.95, metalness: 0, envMapIntensity: 0.5, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  // wet look: mirror reflection from WetReflection, strongest at grazing angles and in puddles
+  m.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, wetUniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vWPos; uniform sampler2D tReflect; uniform mat4 uTexMat; uniform float uWet; uniform float uTime;
+        float wHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float wNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(wHash(i), wHash(i + vec2(1, 0)), f.x), mix(wHash(i + vec2(0, 1)), wHash(i + vec2(1, 1)), f.x), f.y); }`)
+      .replace('#include <opaque_fragment>', `
+        if (uWet > 0.01) {
+          vec3 V = normalize(cameraPosition - vWPos);
+          float F = 0.04 + 0.96 * pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
+          float puddle = smoothstep(0.30, 0.62, wNoise(vWPos.xz * 0.045) * 0.65 + wNoise(vWPos.xz * 0.19) * 0.35);
+          vec4 rc = uTexMat * vec4(vWPos, 1.0);
+          vec2 ripple = vec2(sin(vWPos.x * 2.7 + uTime * 1.6) + sin(vWPos.z * 4.1 - uTime * 2.1), cos(vWPos.z * 3.3 + uTime * 1.3) + cos(vWPos.x * 5.2 + uTime * 1.9)) * 0.0022;
+          float grit = wNoise(vWPos.xz * 6.0) - 0.5;
+          vec2 ruv = rc.xy / rc.w + ripple * (0.4 + 0.6 * puddle) + grit * 0.004 * (1.0 - puddle);
+          float lod = mix(3.2, 0.6, puddle) * (1.0 - 0.5 * uWet);
+          vec3 refl = textureLod(tReflect, clamp(ruv, 0.001, 0.999), lod).rgb;
+          float k = uWet * (0.28 + 0.72 * F) * mix(0.45, 1.0, puddle);
+          outgoingLight = mix(outgoingLight * (1.0 - 0.5 * uWet), refl, k);
+        }
+        #include <opaque_fragment>`);
+  };
+  m.customProgramCacheKey = () => 'asphalt-wet-v1';
   return m;
 }
 

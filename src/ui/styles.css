@@ -20,6 +20,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0f; col
 .msg { font-size: 14px; opacity: .8; }
 
 /* ---------------- HUD ---------------- */
+.hud-boostfx { position: absolute; inset: -10%; opacity: 0; transition: opacity .35s ease-out; animation: boostspin .18s steps(2) infinite;
+  background: repeating-conic-gradient(from 0deg at 50% 52%, rgba(190,230,255,0) 0deg 3.2deg, rgba(190,230,255,.22) 3.5deg 3.9deg, rgba(190,230,255,0) 4.4deg 8.3deg, rgba(255,255,255,.14) 8.5deg 8.7deg, rgba(190,230,255,0) 9deg 14deg);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 52%, transparent 34%, rgba(0,0,0,.9) 78%); mask-image: radial-gradient(ellipse at 50% 52%, transparent 34%, rgba(0,0,0,.9) 78%); mix-blend-mode: screen; }
+@keyframes boostspin { 0% { transform: rotate(0deg) scale(1.02); } 50% { transform: rotate(1.4deg) scale(1.05); } 100% { transform: rotate(-1deg) scale(1.02); } }
 .hud { position: absolute; inset: 0; pointer-events: none !important; font-family: var(--hud-font); }
 .hud * { pointer-events: none; }
 .hud-map { position: absolute; left: 24px; bottom: 26px; width: 210px; }

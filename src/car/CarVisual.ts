@@ -35,6 +35,9 @@ export class CarVisual {
   private baseY: number[] = [];
   private spin = [0, 0, 0, 0];
   night = 0;
+  /** nitrous burn 0..1: drives the exhaust flames */
+  boost = 0;
+  private flames: THREE.Mesh[] = [];
   private envMats: { m: THREE.MeshStandardMaterial; base: number }[] = [];
 
   constructor(gltfScene: THREE.Group) {
@@ -123,6 +126,7 @@ export class CarVisual {
           // a touch of roughness keeps the sun's reflection from being a single-pixel HDR spike
           // (Renderer's sanitize pass clamps what is left before bloom)
           if (mm.name !== 'LensClear') mm.roughness = Math.max(mm.roughness, 0.06);
+          else mm.opacity = 0.22; // clear lamp covers: the bulbs and reflectors show through
         }
         const pm = mm as THREE.MeshPhysicalMaterial;
         if (pm.isMeshPhysicalMaterial && pm.clearcoat > 0) pm.clearcoatRoughness = Math.max(pm.clearcoatRoughness, 0.08);
@@ -130,7 +134,7 @@ export class CarVisual {
         if (mm.name === 'Paint' || mm.name.startsWith('Glass') || mm.name === 'Chrome' || mm.name === 'Mirror') this.envMats.push({ m: mm, base: 0 });
         if (mm.name === 'LensClear') {
           mm.roughness = 0.18;
-          mm.color.set(0x8e979e);
+          mm.color.set(0xc4ccd2);
         }
         if (mm.name === 'Chrome' || mm.name === 'Reflector' || mm.name === 'Mirror') {
           mm.envMapIntensity = 1.0;
@@ -145,11 +149,27 @@ export class CarVisual {
 
     // One spot light for both beams (every dynamic light costs per-pixel shading everywhere on screen; the lamps
     // themselves are emissive). It sits just ahead of the bumper so it lights the road, not the chrome bowls.
-    const s = new THREE.SpotLight(0xfff1d8, 0, 70, 0.6, 0.7, 1.5);
+    const s = new THREE.SpotLight(0xfff4e0, 0, 120, 0.78, 0.55, 1.3);
     s.position.set(0, 0.62, 2.45);
-    s.target.position.set(0, 0.15, 24);
+    s.target.position.set(0, 0.1, 26);
     this.root.add(s, s.target);
     this.headlights.push(s);
+
+    // nitrous: a long blue-white flame with an orange fringe out of the exhaust (additive, flickering)
+    const mk = (r: number, len: number, color: number, op: number) => {
+      const g = new THREE.ConeGeometry(r, len, 14, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -len / 2); // tip points backwards (−Z)
+      const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+      const f = new THREE.Mesh(g, m);
+      f.position.set(-0.5, 0.29, -2.24);
+      f.visible = false;
+      f.renderOrder = 4;
+      this.root.add(f);
+      this.flames.push(f);
+      return f;
+    };
+    mk(0.075, 1.5, 0xff8a2a, 0.55);
+    mk(0.045, 1.15, 0x9fd6ff, 0.9);
+    mk(0.022, 0.8, 0xffffff, 1);
   }
 
   /** Wheel i: spin angle (rad, forward roll positive), steer angle (rad, +left), suspension offset (m, +up). */
@@ -174,6 +194,15 @@ export class CarVisual {
   }
 
   update(dt: number): void {
+    const b = this.boost;
+    for (let i = 0; i < this.flames.length; i++) {
+      const f = this.flames[i];
+      f.visible = b > 0.04;
+      if (f.visible) {
+        const flick = 0.78 + 0.22 * Math.sin(performance.now() * (0.05 + i * 0.013)) + 0.12 * Math.random();
+        f.scale.set(1 + 0.25 * Math.random(), 1 + 0.25 * Math.random(), b * flick * (1.1 - i * 0.08));
+      }
+    }
     // the night sky gives little to reflect: lift the car's reflections so the body keeps its shape and shine
     for (const e of this.envMats) {
       if (!e.base) e.base = e.m.envMapIntensity || 1;
@@ -185,14 +214,14 @@ export class CarVisual {
     const set = (key: string, v: number) => {
       for (const m of this.mats[key] ?? []) m.emissiveIntensity = v;
     };
-    set('head', L.head ? 2.2 : 0);
+    set('head', L.head ? 7 : 0);
     set('tail', L.head ? 0.7 : 0);
     set('brake', L.brake ? 3.5 : L.head ? 0.45 : 0);
     set('reverse', L.reverse ? 2.2 : 0);
     set('indL', L.indicatorLeft && blinkOn ? 2.4 : 0);
     set('indR', L.indicatorRight && blinkOn ? 2.4 : 0);
     set('gauges', L.head ? 0.35 : 0);
-    for (const s of this.headlights) s.intensity = L.head ? 70 : 0;
+    for (const s of this.headlights) s.intensity = L.head ? 330 : 0;
   }
 
   get blinkPhase(): boolean {
