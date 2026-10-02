@@ -4,6 +4,7 @@ import type { WorldData } from '../data/types';
 import { Renderer } from '../render/Renderer';
 import { DayNight } from '../render/DayNight';
 import { SunShadows } from '../render/SunShadows';
+import { Rain } from '../render/Rain';
 import { NightLights } from '../render/NightLights';
 import { QUALITY, type QualityPreset } from '../render/Quality';
 import { World } from '../world/World';
@@ -16,7 +17,7 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { HUD } from '../ui/HUD';
 import { Menu } from '../ui/Menu';
 import { Input } from './Input';
-import { saveSettings, type Settings } from './Settings';
+import { saveSettings, SCENE_HOURS, type Settings } from './Settings';
 import { isMajor } from '../data/roadClasses';
 import { leftNormal } from './geom2d';
 import { Profiler } from './Profiler';
@@ -30,6 +31,7 @@ export class Game {
   readonly renderer: Renderer;
   readonly dayNight: DayNight;
   readonly shadows: SunShadows;
+  readonly rainFx: Rain;
   readonly physics: PhysicsWorld;
   readonly world: World;
   readonly input: Input;
@@ -70,6 +72,10 @@ export class Game {
   private autopilotStuck = 0;
   /** shown top-right on the HUD, e.g. "NIGHT · RAIN" */
   sceneLabel = '';
+  /** weather: 0..1 rain falling, 0..1 road wetness (follows the rain with a delay) */
+  rain = 0;
+  private rainTarget = 0;
+  wet = 0;
   /** debug switch for scripts/test-smoothness.ts: false renders the raw latest physics state */
   interpolate = true;
 
@@ -79,6 +85,7 @@ export class Game {
     this.physics = new PhysicsWorld(R);
     this.shadows = new SunShadows(this.scene, this.camera);
     this.dayNight = new DayNight(this.scene, this.renderer.renderer, this.shadows);
+    this.rainFx = new Rain(this.scene);
     this.world = new World(data, this.physics);
     this.scene.add(this.world.scene);
     this.traffic = new TrafficManager(data, this.physics, this.scene);
@@ -97,7 +104,10 @@ export class Game {
     const q = this.quality;
     this.renderer.applyQuality(q);
     this.shadows.configure({ enabled: q.shadows, mapSize: q.shadowMapSize, maxFar: q.shadowRange });
-    this.dayNight.cycleMinutes = this.params.has('hour') && !this.params.has('cycle') ? 0 : s.cycleMinutes;
+    this.dayNight.cycleMinutes = 0;
+    if (!this.params.has('hour')) this.dayNight.hour = SCENE_HOURS[s.scene] ?? 18.45;
+    this.rainTarget = this.params.has('rain') ? this.params.get('rain') !== '0' ? 1 : 0 : s.rain ? 1 : 0;
+    this.sceneLabel = `${s.scene.toUpperCase()}${this.rainTarget ? ' · RAIN' : ''}`;
     this.dayNight.smog = s.smog;
     this.world.setQuality({ drawDistance: q.drawDistance, propNear: q.propNear, propFar: q.propFar, shadows: q.shadows, shadowRange: q.shadowRange });
     this.traffic.target = Math.round(q.traffic * s.traffic);
@@ -114,7 +124,7 @@ export class Game {
 
   async init(progress: (p: number, msg: string) => void, ui: HTMLElement): Promise<void> {
     const hourParam = this.params.get('hour');
-    this.dayNight.hour = hourParam !== null ? parseFloat(hourParam) : this.settings.timeOfDay;
+    this.dayNight.hour = hourParam !== null ? parseFloat(hourParam) : SCENE_HOURS[this.settings.scene] ?? 18.45;
     const sp = this.data.spawn;
     const x = parseFloat(this.params.get('x') ?? String(sp.x));
     const z = parseFloat(this.params.get('z') ?? String(sp.z));
@@ -134,7 +144,6 @@ export class Game {
       onQuitToMenu: () => this.toMenu(),
       onSettingsChanged: (s) => {
         saveSettings(s);
-        if (!this.params.has('hour')) this.dayNight.cycleMinutes = s.cycleMinutes;
         this.applySettings();
       },
       onResetCar: () => this.resetCar(),
@@ -182,6 +191,13 @@ export class Game {
     if (!this.audio) {
       try {
         this.audio = new AudioEngine(this.settings);
+        this.audio.load(import.meta.env.BASE_URL).catch((e) => console.error('Audio samples failed to load:', e));
+        this.traffic.onNearMiss = (closing) => {
+          const s = Math.min(1, closing / 60);
+          this.audio?.whoosh(s);
+          this.car.vehicle.nitro = Math.min(1, this.car.vehicle.nitro + 0.06 + 0.06 * s);
+          this.hud.toast('NEAR MISS', 0.9);
+        };
         this.traffic.onHonk = (x, z, kind) => {
           const v = this.car.vehicle;
           const dx = x - v.position.x, dz = z - v.position.z;
@@ -400,6 +416,13 @@ export class Game {
     // ---- world, time of day, traffic
     if (this.mode !== 'pause') {
       P.begin('dayNight');
+      this.rain += (this.rainTarget - this.rain) * Math.min(1, dt * 0.8);
+      this.wet += (this.rainTarget - this.wet) * Math.min(1, dt * (this.rainTarget > this.wet ? 0.25 : 0.1));
+      this.world.asphaltMat.roughness = 0.95 - 0.7 * this.wet;
+      this.world.asphaltMat.envMapIntensity = 0.5 + 2.2 * this.wet;
+      v.wet = this.wet;
+      this.dayNight.smog = this.settings.smog * (1 + 0.8 * this.rain);
+      this.rainFx.update(dt, this.rain, this.camera.position, v.velocity, 1 - this.dayNight.state.night);
       this.dayNight.update(dt);
       const night = this.dayNight.state.night;
       this.world.setNight(night);
@@ -440,10 +463,14 @@ export class Game {
       const indicating = L.indicatorLeft || L.indicatorRight;
       const tick = indicating && blink !== this.lastBlink;
       this.lastBlink = blink;
+      const dtn = v.drivetrain;
+      let skid = 0;
+      for (const w of v.wheels) skid = Math.max(skid, w.skid);
       this.audio?.update(dt, {
-        rpm: v.drivetrain.rpm, throttle: v.drivetrain.throttleEff, load: v.drivetrain.torqueOut / 150, speed: Math.abs(v.speed), slip: v.maxSlip,
+        rpm: dtn.rpm, redline: dtn.redline, throttle: dtn.throttleEff, load: dtn.torqueOut / 480, boost: dtn.boost, nitro: v.nitroActive, limiting: dtn.limiting, shiftCount: dtn.shiftCount,
+        speed: v.groundKmh / 3.6, slip: v.maxSlip, skid,
         surfaceGrass: v.surfaceGrass, horn: this.input.drive.horn, indicatorTick: tick, reversing: v.reversing, interior: this.rig.mode === 'interior',
-      }, { night: this.dayNight.state.night, nearMajorRoad: this.nearMajor, trafficNear: Math.min(1, this.traffic.count / 40) });
+      }, { night: this.dayNight.state.night, nearMajorRoad: this.nearMajor, trafficNear: Math.min(1, this.traffic.count / 40), rain: this.rain, wet: this.wet });
       P.end();
       if (this.settings.showFps) {
         const s = this.stats();

@@ -1,10 +1,13 @@
 // Persistent user settings (localStorage, guarded: private windows may throw).
 import type { QualityName } from '../render/Quality';
 
+export type SceneName = 'dawn' | 'day' | 'afternoon' | 'evening' | 'night';
+export const SCENE_HOURS: Record<SceneName, number> = { dawn: 6.05, day: 12, afternoon: 16, evening: 18.45, night: 22 };
+
 export interface Settings {
   quality: QualityName;
-  timeOfDay: number; // hour 0–24 at start
-  cycleMinutes: number; // real minutes per game day (0 = frozen)
+  scene: SceneName; // fixed time of day (no cycle)
+  rain: boolean;
   smog: number; // 0.3 – 2
   traffic: number; // density multiplier 0 – 1.5
   masterVolume: number;
@@ -19,8 +22,8 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   quality: 'medium',
-  timeOfDay: 16.5,
-  cycleMinutes: 24,
+  scene: 'evening',
+  rain: false,
   smog: 1,
   traffic: 1,
   masterVolume: 0.8,
@@ -33,7 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
   invertCameraX: false,
 };
 
-const KEY = 'gulberg-drive.settings.v1';
+const KEY = 'gulberg-drive.settings.v2';
 
 export function loadSettings(): Settings {
   try {

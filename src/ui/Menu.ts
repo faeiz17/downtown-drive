@@ -82,7 +82,6 @@ export class Menu {
 
   private renderSettings(): void {
     const s = this.settings;
-    const hour = (h: number) => `${((Math.floor(h) + 11) % 12) + 1}:${String(Math.round((h % 1) * 60)).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
     this.root.innerHTML = `
       <div class="menu settings">
         <h2>Settings</h2>
@@ -91,10 +90,12 @@ export class Menu {
           <div class="seg" data-k="quality">
             ${(['low', 'medium', 'high'] as const).map((q) => `<button data-v="${q}" class="${s.quality === q ? 'on' : ''}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}
           </div>
-          <label>Start time <span class="val" data-for="timeOfDay">${hour(s.timeOfDay)}</span></label>
-          <input type="range" data-k="timeOfDay" min="0" max="23.75" step="0.25" value="${s.timeOfDay}">
-          <label>Day length <span class="val" data-for="cycleMinutes">${s.cycleMinutes ? s.cycleMinutes + ' min' : 'frozen'}</span></label>
-          <input type="range" data-k="cycleMinutes" min="0" max="60" step="2" value="${s.cycleMinutes}">
+          <label>Time of day</label>
+          <div class="seg" data-k="scene">
+            ${(['dawn', 'day', 'afternoon', 'evening', 'night'] as const).map((q) => `<button data-v="${q}" class="${s.scene === q ? 'on' : ''}">${q[0].toUpperCase() + q.slice(1)}</button>`).join('')}
+          </div>
+          <label>Rain</label>
+          <div class="seg" data-k="rain"><button data-v="true" class="${s.rain ? 'on' : ''}">On</button><button data-v="false" class="${!s.rain ? 'on' : ''}">Off</button></div>
           <label>Smog / haze <span class="val" data-for="smog">${Math.round(s.smog * 100)}%</span></label>
           <input type="range" data-k="smog" min="0.2" max="2" step="0.05" value="${s.smog}">
           <label>Traffic density <span class="val" data-for="traffic">${Math.round(s.traffic * 100)}%</span></label>
@@ -128,7 +129,7 @@ export class Menu {
         const lab = this.root.querySelector(`.val[data-for=${k}]`);
         if (lab) {
           const v = parseFloat(inp.value);
-          lab.textContent = k === 'timeOfDay' ? hour(v) : k === 'cycleMinutes' ? (v ? v + ' min' : 'frozen') : `${Math.round(v * 100)}%`;
+          lab.textContent = `${Math.round(v * 100)}%`;
         }
         this.cb.onSettingsChanged(s);
       });
@@ -167,6 +168,7 @@ export class Menu {
       ['Change camera', 'C', 'Back / View'],
       ['Look back', 'B', 'R3'],
       ['Orbit camera', 'Drag mouse', 'Right stick'],
+      ['Nitrous', 'Shift', 'X / LB'],
       ['Reset car to road', 'R', 'Y'],
       ['Toggle minimap', 'M', '—'],
       ['Pause', 'Esc / P', 'Start'],

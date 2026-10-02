@@ -1,0 +1,90 @@
+{
+ "sampleRate": 32000,
+ "source": "Freesound #496171 \"Import car revs on Chassis Dyno with Turbo\" by editboy23 (CC0)",
+ "loops": [
+  {
+   "offset": 0,
+   "length": 30968,
+   "hz": 31.0,
+   "kind": "psola"
+  },
+  {
+   "offset": 31288,
+   "length": 30545,
+   "hz": 44.001,
+   "kind": "psola"
+  },
+  {
+   "offset": 62153,
+   "length": 32000,
+   "hz": 60.0,
+   "kind": "psola"
+  },
+  {
+   "offset": 94473,
+   "length": 31200,
+   "hz": 80.0,
+   "kind": "psola"
+  },
+  {
+   "offset": 125993,
+   "length": 31030,
+   "hz": 99.001,
+   "kind": "psola"
+  },
+  {
+   "offset": 157343,
+   "length": 8136,
+   "hz": 117.994,
+   "kind": "real"
+  },
+  {
+   "offset": 165799,
+   "length": 10030,
+   "hz": 133.998,
+   "kind": "real"
+  },
+  {
+   "offset": 176149,
+   "length": 18411,
+   "hz": 146.0,
+   "kind": "real"
+  },
+  {
+   "offset": 194880,
+   "length": 20025,
+   "hz": 162.996,
+   "kind": "real"
+  },
+  {
+   "offset": 215225,
+   "length": 17179,
+   "hz": 189.999,
+   "kind": "real"
+  },
+  {
+   "offset": 232724,
+   "length": 16239,
+   "hz": 200.998,
+   "kind": "real"
+  },
+  {
+   "offset": 249283,
+   "length": 12986,
+   "hz": 206.992,
+   "kind": "real"
+  },
+  {
+   "offset": 262589,
+   "length": 14423,
+   "hz": 212.993,
+   "kind": "real"
+  },
+  {
+   "offset": 277332,
+   "length": 9644,
+   "hz": 218.996,
+   "kind": "real"
+  }
+ ]
+}
