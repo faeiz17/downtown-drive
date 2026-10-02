@@ -1,7 +1,7 @@
 // Rain: streaks animated entirely on the GPU in a box that follows the camera (no per-frame CPU work).
 import * as THREE from 'three';
 
-const N = 9000;
+const N = 16000;
 const BOX = new THREE.Vector3(46, 26, 46);
 
 export class Rain {
@@ -54,7 +54,7 @@ export class Rain {
     this.u.uTime.value += dt;
     this.u.uCam.value.copy(cam);
     this.u.uVel.value.copy(carVel);
-    this.u.uAlpha.value = amount * (0.22 + 0.3 * light);
+    this.u.uAlpha.value = amount * (0.5 + 0.35 * light);
     this.u.uColor.value.setRGB(0.55 + 0.4 * light, 0.6 + 0.38 * light, 0.7 + 0.3 * light);
   }
 }

@@ -418,7 +418,7 @@ export class Game {
       P.begin('dayNight');
       this.rain += (this.rainTarget - this.rain) * Math.min(1, dt * 0.8);
       this.wet += (this.rainTarget - this.wet) * Math.min(1, dt * (this.rainTarget > this.wet ? 0.25 : 0.1));
-      this.world.asphaltMat.roughness = 0.95 - 0.7 * this.wet;
+      this.world.asphaltMat.roughness = 0.95 - 0.82 * this.wet;
       this.world.asphaltMat.envMapIntensity = 0.5 + 2.2 * this.wet;
       v.wet = this.wet;
       this.dayNight.smog = this.settings.smog * (1 + 0.8 * this.rain);
