@@ -159,11 +159,11 @@ export class Menu {
     const rows: [string, string, string][] = [
       ['Accelerate', 'W / ↑', 'RT'],
       ['Brake / reverse', 'S / ↓', 'LT'],
-      ['Steer', 'A D / ← →', 'Left stick'],
+      ['Steer', 'A D / ← →', 'Left stick / D-pad ← →'],
       ['Handbrake', 'Space', 'RB / A'],
       ['Horn', 'H', 'L3 / B'],
       ['Headlights', 'L', 'D-pad ↑'],
-      ['Indicators left / right', 'Q / E', 'D-pad ← / →'],
+      ['Indicators left / right', 'Q / E', '—'],
       ['Hazard lights', 'Z', 'D-pad ↓'],
       ['Change camera', 'C', 'Back / View'],
       ['Look back', 'B', 'R3'],

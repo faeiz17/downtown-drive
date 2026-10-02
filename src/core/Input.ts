@@ -18,6 +18,7 @@ export class Input {
   private padPrev: boolean[] = [];
   readonly drive: DriveInput = { throttle: 0, brake: 0, steer: 0, handbrake: false, horn: false, lookBack: false, nitro: false };
   private kbSteer = 0;
+  private padSteer = 0;
   /** mouse orbit for the chase camera */
   mouseDX = 0;
   mouseDY = 0;
@@ -108,8 +109,14 @@ export class Input {
       const dz = Math.abs(ax) < 0.12 ? 0 : (ax - Math.sign(ax) * 0.12) / 0.88;
       const rt = gp.buttons[7]?.value ?? 0, lt = gp.buttons[6]?.value ?? 0;
       if (Math.abs(dz) > 0.01 || rt > 0.02 || lt > 0.02) this.usingGamepad = true;
+      // d-pad steers too (digital, ramped like the keyboard); the stick takes over when it is moved
+      const dpad = (gp.buttons[15]?.pressed ? 1 : 0) - (gp.buttons[14]?.pressed ? 1 : 0);
+      const pr = dpad === 0 ? 7 : Math.sign(dpad) !== Math.sign(this.padSteer) ? 10 : 5.5;
+      const pd = dpad - this.padSteer;
+      this.padSteer += Math.sign(pd) * Math.min(Math.abs(pd), pr * dt);
+      if (dpad !== 0) this.usingGamepad = true;
       if (this.usingGamepad) {
-        steer = Math.sign(dz) * Math.pow(Math.abs(dz), 1.4);
+        steer = Math.abs(dz) > 0.01 ? Math.sign(dz) * Math.pow(Math.abs(dz), 1.4) : this.padSteer;
         throttle = Math.max(throttle, rt);
         brake = Math.max(brake, lt);
       }
@@ -124,8 +131,6 @@ export class Input {
       edge(12, 'lights'); // d-pad up
       edge(8, 'camera'); // back/select
       edge(3, 'reset'); // Y / triangle
-      edge(14, 'indLeft'); // d-pad left
-      edge(15, 'indRight'); // d-pad right
       edge(13, 'hazard'); // d-pad down
       edge(9, 'pause'); // start
       // right stick orbits the camera
