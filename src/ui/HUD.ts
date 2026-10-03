@@ -3,6 +3,7 @@
 // street name, minimap, FPS overlay and toast messages.
 import type { WorldData } from '../data/types';
 import { Minimap } from './Minimap';
+import { RainOverlay } from './RainOverlay';
 
 export interface HudState {
   kmh: number;
@@ -41,6 +42,7 @@ const FONT = '"Avenir Next Condensed", "Barlow Condensed", "Arial Narrow", "Helv
 export class HUD {
   readonly root: HTMLDivElement;
   readonly minimap: Minimap;
+  readonly rainOverlay: RainOverlay;
   private gauge: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
   private face: HTMLCanvasElement; // static dial face, drawn once
@@ -89,6 +91,7 @@ export class HUD {
       <div class="hud-fps"></div>
       <div class="hud-toast"></div>`;
     parent.appendChild(this.root);
+    this.rainOverlay = new RainOverlay(this.root);
     this.minimap = new Minimap(world, 210);
     this.root.querySelector('.hud-map')!.prepend(this.minimap.canvas);
     this.gauge = this.root.querySelector('.hud-gauge') as HTMLCanvasElement;

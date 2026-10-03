@@ -187,6 +187,25 @@ export class TrafficManager {
       this.signalBulbs.setMatrixAt(i, this.m4.compose(this.p3.set(bulbs[i * 4], y, bulbs[i * 4 + 1]), this.q, this.s3));
     }
     scene.add(this.signalBulbs);
+    // soft glow around every lit bulb (shares the bulbs' colours, so it follows the signal phase)
+    const gc = document.createElement('canvas');
+    gc.width = gc.height = 64;
+    const gx = gc.getContext('2d')!;
+    const gg = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gg.addColorStop(0, 'rgba(255,255,255,1)');
+    gg.addColorStop(0.25, 'rgba(255,255,255,0.35)');
+    gg.addColorStop(1, 'rgba(255,255,255,0)');
+    gx.fillStyle = gg;
+    gx.fillRect(0, 0, 64, 64);
+    const haloGeo = new THREE.CircleGeometry(0.75, 20).translate(0, 0, 0.14);
+    const haloMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), color: new THREE.Color(0.09, 0.09, 0.09), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false });
+    const halo = new THREE.InstancedMesh(haloGeo, haloMat, bulbs.length / 4);
+    halo.instanceMatrix = this.signalBulbs.instanceMatrix;
+    halo.instanceColor = this.signalBulbs.instanceColor;
+    halo.count = bulbs.length / 4;
+    halo.frustumCulled = false;
+    halo.renderOrder = 6;
+    scene.add(halo);
   }
 
   private approachGroup(cluster: number, tx: number, tz: number): number {

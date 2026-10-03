@@ -5,6 +5,19 @@ import { RNG } from '../core/rng';
 import { wetUniforms } from '../render/WetReflection';
 
 /** MeshStandardMaterial that samples textures from an atlas cell per vertex (repeating inside the cell). */
+const white = new THREE.DataTexture(new Uint8Array([200, 200, 200, 255]), 1, 1);
+white.needsUpdate = true;
+const detailUniform = { value: white as THREE.Texture };
+/** Real PBR concrete/plaster texture (Poly Haven, CC0) used as wall detail. */
+export function loadWallDetail(url: string): void {
+  new THREE.TextureLoader().load(url, (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    t.colorSpace = THREE.NoColorSpace;
+    detailUniform.value = t;
+  });
+}
+
 export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({
     map: atlas.map,
@@ -18,11 +31,13 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
     vertexColors: true,
   });
   m.onBeforeCompile = (shader) => {
+    patchWet(shader, true);
+    shader.uniforms.tDetail = detailUniform;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 cell;\nvarying vec4 vCell;\nvarying vec2 vTileUv;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvCell = cell;\nvTileUv = uv;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vCell;\nvarying vec2 vTileUv;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vCell;\nvarying vec2 vTileUv;\nuniform sampler2D tDetail;')
       .replace(
         '#include <map_fragment>',
         `vec2 aT = clamp(fract(vTileUv), vec2(0.002), vec2(0.998));
@@ -30,7 +45,15 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
          vec2 aDx = dFdx(vTileUv) * vCell.zw;
          vec2 aDy = dFdy(vTileUv) * vCell.zw;
          vec4 sampledDiffuseColor = textureGrad(map, aUv, aDx, aDy);
-         diffuseColor *= sampledDiffuseColor;`,
+         diffuseColor *= sampledDiffuseColor;
+         // real plaster/concrete grain, projected in world space onto vertical surfaces (walls, fences)
+         {
+           vec3 gN = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
+           vec3 bl = pow(abs(gN), vec3(4.0)); bl /= (bl.x + bl.y + bl.z);
+           float dv = texture2D(tDetail, vWPos.zy * 0.33).r * bl.x + texture2D(tDetail, vWPos.xy * 0.33).r * bl.z + texture2D(tDetail, vWPos.xz * 0.33).r * bl.y;
+           float wallMask = smoothstep(0.55, 0.2, abs(gN.y));
+           diffuseColor.rgb *= mix(1.0, clamp(dv * 1.55, 0.55, 1.4), 0.75 * wallMask);
+         }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
@@ -46,8 +69,41 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
       )
       .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= textureGrad(emissiveMap, aUv, aDx, aDy).rgb;');
   };
-  m.customProgramCacheKey = () => 'atlas-v1';
+  m.customProgramCacheKey = () => 'atlas-v2-wet-detail';
   return m;
+}
+
+
+/**
+ * Wet look from the planar reflection (see WetReflection): Fresnel-weighted mirror image with ripples and puddle
+ * variation. `gated` limits it to horizontal surfaces near the ground (sidewalks, kerbs, lane paint) so walls stay dry.
+ */
+export function patchWet(shader: { uniforms: Record<string, { value: unknown }>; vertexShader: string; fragmentShader: string }, gated: boolean): void {
+  Object.assign(shader.uniforms, wetUniforms);
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vWPos; uniform sampler2D tReflect; uniform mat4 uTexMat; uniform float uWet; uniform float uTime;
+      float wHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float wNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(wHash(i), wHash(i + vec2(1, 0)), f.x), mix(wHash(i + vec2(0, 1)), wHash(i + vec2(1, 1)), f.x), f.y); }`)
+    .replace('#include <opaque_fragment>', `
+      if (uWet > 0.01 ${gated ? '&& vWPos.y < 0.45 && (vec4(normal, 0.0) * viewMatrix).y > 0.85' : ''}) {
+        vec3 V = normalize(cameraPosition - vWPos);
+        float F = 0.04 + 0.96 * pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
+        float puddle = smoothstep(0.30, 0.62, wNoise(vWPos.xz * 0.045) * 0.65 + wNoise(vWPos.xz * 0.19) * 0.35);
+        vec4 rc = uTexMat * vec4(vWPos, 1.0);
+        vec2 ripple = vec2(sin(vWPos.x * 2.7 + uTime * 1.6) + sin(vWPos.z * 4.1 - uTime * 2.1), cos(vWPos.z * 3.3 + uTime * 1.3) + cos(vWPos.x * 5.2 + uTime * 1.9)) * 0.0022;
+        float grit = wNoise(vWPos.xz * 6.0) - 0.5;
+        vec2 ruv = rc.xy / rc.w + ripple * (0.4 + 0.6 * puddle) + grit * 0.004 * (1.0 - puddle);
+        float lod = mix(3.2, 0.6, puddle) * (1.0 - 0.5 * uWet);
+        vec3 refl = textureLod(tReflect, clamp(ruv, 0.001, 0.999), lod).rgb;
+        float k = uWet * (0.28 + 0.72 * F) * mix(0.45, 1.0, puddle) ${gated ? '* 0.75' : ''};
+        outgoingLight = mix(outgoingLight * (1.0 - 0.5 * uWet), refl, k);
+      }
+      #include <opaque_fragment>`);
 }
 
 export function createAsphaltMaterial(): THREE.MeshStandardMaterial {
@@ -96,39 +152,16 @@ export function createAsphaltMaterial(): THREE.MeshStandardMaterial {
   t.anisotropy = 8;
   const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.95, metalness: 0, envMapIntensity: 0.5, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   // wet look: mirror reflection from WetReflection, strongest at grazing angles and in puddles
-  m.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, wetUniforms);
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
-        varying vec3 vWPos; uniform sampler2D tReflect; uniform mat4 uTexMat; uniform float uWet; uniform float uTime;
-        float wHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float wNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-          return mix(mix(wHash(i), wHash(i + vec2(1, 0)), f.x), mix(wHash(i + vec2(0, 1)), wHash(i + vec2(1, 1)), f.x), f.y); }`)
-      .replace('#include <opaque_fragment>', `
-        if (uWet > 0.01) {
-          vec3 V = normalize(cameraPosition - vWPos);
-          float F = 0.04 + 0.96 * pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
-          float puddle = smoothstep(0.30, 0.62, wNoise(vWPos.xz * 0.045) * 0.65 + wNoise(vWPos.xz * 0.19) * 0.35);
-          vec4 rc = uTexMat * vec4(vWPos, 1.0);
-          vec2 ripple = vec2(sin(vWPos.x * 2.7 + uTime * 1.6) + sin(vWPos.z * 4.1 - uTime * 2.1), cos(vWPos.z * 3.3 + uTime * 1.3) + cos(vWPos.x * 5.2 + uTime * 1.9)) * 0.0022;
-          float grit = wNoise(vWPos.xz * 6.0) - 0.5;
-          vec2 ruv = rc.xy / rc.w + ripple * (0.4 + 0.6 * puddle) + grit * 0.004 * (1.0 - puddle);
-          float lod = mix(3.2, 0.6, puddle) * (1.0 - 0.5 * uWet);
-          vec3 refl = textureLod(tReflect, clamp(ruv, 0.001, 0.999), lod).rgb;
-          float k = uWet * (0.28 + 0.72 * F) * mix(0.45, 1.0, puddle);
-          outgoingLight = mix(outgoingLight * (1.0 - 0.5 * uWet), refl, k);
-        }
-        #include <opaque_fragment>`);
-  };
+  m.onBeforeCompile = (shader) => patchWet(shader, false);
   m.customProgramCacheKey = () => 'asphalt-wet-v1';
   return m;
 }
 
 export function createMarkingMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  m.onBeforeCompile = (shader) => patchWet(shader, true);
+  m.customProgramCacheKey = () => 'marking-wet-v1';
+  return m;
 }
 
 export function createWaterMaterial(): THREE.MeshStandardMaterial {

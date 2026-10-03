@@ -37,6 +37,9 @@ export class CarVisual {
   night = 0;
   /** nitrous burn 0..1: drives the exhaust flames */
   boost = 0;
+  /** 0..1 haze/rain: headlight beams become visible shafts of light */
+  haze = 0;
+  private shafts: THREE.Mesh[] = [];
   private flames: THREE.Mesh[] = [];
   private envMats: { m: THREE.MeshStandardMaterial; base: number }[] = [];
 
@@ -155,6 +158,24 @@ export class CarVisual {
     this.root.add(s, s.target);
     this.headlights.push(s);
 
+    // visible light shafts from each headlight (additive cones, brighter in rain / haze, soft at the edges)
+    const shaftMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, toneMapped: false,
+      uniforms: { uAmt: { value: 0 } },
+      vertexShader: `varying float vT; varying float vE; void main() { vT = 1.0 - (position.z / -26.0 + 0.0); vec4 mv = modelViewMatrix * vec4(position, 1.0); vec3 n = normalize(normalMatrix * normal); vE = pow(abs(dot(n, normalize(-mv.xyz))), 1.6); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform float uAmt; varying float vT; varying float vE; void main() { float a = uAmt * vE * pow(clamp(vT, 0.0, 1.0), 1.3) * smoothstep(0.0, 0.08, 1.0 - vT); gl_FragColor = vec4(vec3(1.0, 0.95, 0.82) * a, 1.0); }`,
+    });
+    for (const x of [-0.58, 0.58]) {
+      const g = new THREE.ConeGeometry(2.6, 26, 28, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 13); // apex at origin, opens forwards
+      const cone = new THREE.Mesh(g, shaftMat);
+      cone.position.set(x, 0.66, 2.3);
+      cone.rotation.x = 0.03;
+      cone.renderOrder = 5;
+      cone.visible = false;
+      this.root.add(cone);
+      this.shafts.push(cone);
+    }
+
     // nitrous: a long blue-white flame with an orange fringe out of the exhaust (additive, flickering)
     const mk = (r: number, len: number, color: number, op: number) => {
       const g = new THREE.ConeGeometry(r, len, 14, 1, true).rotateX(-Math.PI / 2).translate(0, 0, -len / 2); // tip points backwards (−Z)
@@ -194,6 +215,11 @@ export class CarVisual {
   }
 
   update(dt: number): void {
+    const on = this.lights.head;
+    for (const s of this.shafts) {
+      s.visible = on && this.night > 0.15;
+      if (s.visible) (s.material as THREE.ShaderMaterial).uniforms.uAmt.value = (0.035 + 0.05 * this.night) * (1 + 3.2 * this.haze);
+    }
     const b = this.boost;
     for (let i = 0; i < this.flames.length; i++) {
       const f = this.flames[i];

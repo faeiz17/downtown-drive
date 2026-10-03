@@ -6,6 +6,7 @@ import { DayNight } from '../render/DayNight';
 import { SunShadows } from '../render/SunShadows';
 import { Rain } from '../render/Rain';
 import { WetReflection } from '../render/WetReflection';
+import { Effects } from '../render/Effects';
 import { NightLights } from '../render/NightLights';
 import { QUALITY, type QualityPreset } from '../render/Quality';
 import { World } from '../world/World';
@@ -35,6 +36,7 @@ export class Game {
   readonly shadows: SunShadows;
   readonly rainFx: Rain;
   readonly wetFx: WetReflection;
+  readonly fx: Effects;
   /** soft cool light that follows the car after dark (constant light count: no shader recompiles) */
   private readonly carFill: THREE.PointLight;
   readonly physics: PhysicsWorld;
@@ -99,6 +101,7 @@ export class Game {
     this.scene.add(this.world.scene);
     this.traffic = new TrafficManager(data, this.physics, this.scene);
     this.nightLights = new NightLights(this.scene, this.world.lampHeads, 0);
+    this.fx = new Effects(this.scene, this.world.lampHeads);
     this.input = new Input(canvas);
     window.addEventListener('resize', () => this.renderer.resize());
     document.addEventListener('visibilitychange', () => {
@@ -382,6 +385,7 @@ export class Game {
         const s = Math.min(1, maxF / 90000);
         this.audio?.impact(s);
         this.rig.addShake(s * 0.8);
+        this.fx.sparkBurst(v.position.x, v.position.y + 0.5, v.position.z, v.velocity.x, v.velocity.z, Math.round(30 + 90 * s));
         this.impactCd = 0.25;
         this.telemetry.impacts++;
       }
@@ -431,12 +435,14 @@ export class Game {
       this.world.asphaltMat.envMapIntensity = 0.5 + 2.2 * this.wet;
       v.wet = this.wet;
       this.dayNight.smog = this.settings.smog * (1 + 0.8 * this.rain);
+      if (this.mode === 'play') this.fx.update(dt, v, this.camera.position, this.rain, this.wet, this.dayNight.state.night);
       this.rainFx.update(dt, this.rain, this.camera.position, v.velocity, 1 - this.dayNight.state.night);
       this.dayNight.update(dt);
       const night = this.dayNight.state.night;
       this.world.setNight(night);
       this.world.poolMat.opacity *= 1 - 0.3 * this.wet;
       car.visual.night = night;
+      car.visual.haze = this.rain;
       this.carFill.position.set(carPos.x, carPos.y + 3.2, carPos.z).addScaledVector(this.scratchFwd.set(Math.sin(v.heading), 0, Math.cos(v.heading)), -1.5);
       this.carFill.intensity = night * 55;
       if (!this.autoLightsDone && night > 0.55 && this.mode === 'play') {
@@ -463,6 +469,7 @@ export class Game {
       this.telemetry.distance += Math.abs(v.speed) * dt;
       const L = car.visual.lights;
       const blink = car.visual.blinkPhase;
+      this.hud.rainOverlay.update(dt, this.rain, v.groundKmh, this.rig.mode === 'interior' || this.rig.mode === 'hood');
       this.hud.update(dt, {
         kmh: v.groundKmh, rpm: v.drivetrain.rpm, redline: v.drivetrain.redline, gear: v.drivetrain.gearLabel, nitro: v.nitro, nitroActive: v.nitroActive,
         driftScore: v.driftScore, driftBanked: v.driftBanked, driftBankedCount: v.driftBankedCount,
