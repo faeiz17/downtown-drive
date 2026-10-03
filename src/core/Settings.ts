@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 'medium',
   scene: 'evening',
   rain: false,
-  police: true,
+  police: false,
   smog: 1,
   traffic: 1,
   masterVolume: 0.8,
@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   invertCameraX: false,
 };
 
-const KEY = 'gulberg-drive.settings.v2';
+const KEY = 'gulberg-drive.settings.v3';
 
 export function loadSettings(): Settings {
   try {

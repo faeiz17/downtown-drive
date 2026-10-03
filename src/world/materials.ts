@@ -42,7 +42,7 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
       .replace('#include <common>', '#include <common>\nattribute vec4 cell;\nvarying vec4 vCell;\nvarying vec2 vTileUv;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvCell = cell;\nvTileUv = uv;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vCell;\nvarying vec2 vTileUv;\nuniform sampler2D tDetail;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vCell;\nvarying vec2 vTileUv;\nuniform sampler2D tDetail;\nfloat winMask; vec3 roomCol; vec3 roomEmit;\nfloat rHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 17381.37); }')
       .replace(
         '#include <map_fragment>',
         `vec2 aT = clamp(fract(vTileUv), vec2(0.002), vec2(0.998));
@@ -58,13 +58,46 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
            float dv = texture2D(tDetail, vWPos.zy * 0.33).r * bl.x + texture2D(tDetail, vWPos.xy * 0.33).r * bl.z + texture2D(tDetail, vWPos.xz * 0.33).r * bl.y;
            float wallMask = smoothstep(0.55, 0.2, abs(gN.y));
            diffuseColor.rgb *= mix(1.0, clamp(dv * 1.55, 0.55, 1.4), 0.75 * wallMask);
+           // window panes (dark blue-grey glass in the facade art) become little rooms seen through the glass:
+           // interior mapping, a box per bay with back wall, side walls, floor and ceiling, lit or dark per room
+           winMask = 0.0; roomCol = vec3(0.0); roomEmit = vec3(0.0);
+           vec3 sc = sampledDiffuseColor.rgb;
+           float slum = dot(sc, vec3(0.2126, 0.7152, 0.0722));
+           winMask = smoothstep(0.22, 0.09, slum) * smoothstep(0.0, 0.025, sc.b - sc.r * 1.08) * smoothstep(0.4, 0.15, abs(gN.y));
+           if (winMask > 0.01) {
+             vec3 V = normalize(cameraPosition - vWPos);
+             vec3 dp1 = dFdx(vWPos), dp2 = dFdy(vWPos); vec2 du1 = dFdx(vTileUv), du2 = dFdy(vTileUv);
+             vec3 p2p = cross(dp2, gN), p1p = cross(gN, dp1);
+             vec3 Tt = normalize(p2p * du1.x + p1p * du2.x), Bt = normalize(p2p * du1.y + p1p * du2.y);
+             vec3 rd = vec3(-dot(V, Tt) / 3.5, -dot(V, Bt) / 2.6, max(dot(V, gN), 0.05));
+             vec3 ro = vec3(fract(vTileUv), 0.0);
+             float D = 0.5;
+             float tx = rd.x > 0.0 ? (1.0 - ro.x) / rd.x : -ro.x / rd.x;
+             float ty = rd.y > 0.0 ? (1.0 - ro.y) / rd.y : -ro.y / rd.y;
+             float tz = D / rd.z;
+             float tm = min(tz, min(tx, ty));
+             vec3 hit = ro + rd * tm;
+             vec2 rid = floor(vTileUv) + vCell.xy * 91.0;
+             float h1 = rHash(rid), h2 = rHash(rid + 7.7), h3 = rHash(rid + 3.1);
+             bool lit = h1 > 0.58;
+             vec3 wall = lit ? mix(vec3(1.0, 0.78, 0.5), vec3(0.78, 0.9, 1.0), h2) * (0.55 + 0.5 * h3) : vec3(0.06, 0.07, 0.09) * (0.6 + h3);
+             vec3 surf = wall;
+             if (tm == ty) surf = hit.y > 0.5 ? wall * 1.25 : wall * 0.45;          // ceiling light / dark floor
+             else if (tm == tx) surf = wall * (0.55 + 0.25 * h2);                    // side walls
+             else surf = wall * (0.8 + 0.25 * sin(hit.x * 11.0 + h3 * 6.0) * sin(hit.y * 7.0)); // back wall with a little structure
+             surf *= 1.0 - 0.5 * clamp(hit.z / D, 0.0, 1.0);
+             roomCol = surf;
+             roomEmit = lit ? surf * 0.8 : vec3(0.0);
+             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.016, 0.022) + roomCol * (lit ? 0.12 : 0.5), winMask * 0.85);
+           }
          }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
         `float roughnessFactor = roughness;
          vec4 texelRoughness = textureGrad(roughnessMap, aUv, aDx, aDy);
-         roughnessFactor *= texelRoughness.g;`,
+         roughnessFactor *= texelRoughness.g;
+         roughnessFactor = mix(roughnessFactor, 0.07, winMask * 0.85);`,
       )
       .replace(
         '#include <metalnessmap_fragment>',
@@ -72,9 +105,9 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
          vec4 texelMetalness = textureGrad(metalnessMap, aUv, aDx, aDy);
          metalnessFactor *= texelMetalness.b;`,
       )
-      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= textureGrad(emissiveMap, aUv, aDx, aDy).rgb;');
+      .replace('#include <emissivemap_fragment>', 'vec3 e0 = totalEmissiveRadiance; totalEmissiveRadiance *= textureGrad(emissiveMap, aUv, aDx, aDy).rgb; totalEmissiveRadiance = mix(totalEmissiveRadiance, e0 * roomEmit, winMask);');
   };
-  m.customProgramCacheKey = () => 'atlas-v2-wet-detail';
+  m.customProgramCacheKey = () => 'atlas-v3-windows';
   return m;
 }
 

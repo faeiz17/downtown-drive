@@ -306,12 +306,12 @@ function cellDefs(atlas: WorldAtlas): CellDef[] {
 
   // --- residential facades: 1 floor × 4 bays (12 m × 3.2 m) --------------------------------------------------
   const resStyles: { name: string; base: string; frame: string; glass: string; grill?: string; arch?: boolean; band?: string; stone?: string }[] = [
-    { name: 'res_cream', base: '#e8dcc0', frame: '#6b4a30', glass: '#56677a', grill: '#2b2b2b', band: '#d4c4a0' },
+    { name: 'res_cream', base: '#e8dcc0', frame: '#6b4a30', glass: '#56677a', band: '#d4c4a0' },
     { name: 'res_white', base: '#efeeea', frame: '#3a3a3a', glass: '#4f6a86', band: '#9aa0a6', stone: '#8f8f8a' },
-    { name: 'res_beige_arch', base: '#e3cfa8', frame: '#7a5638', glass: '#5c6f80', grill: '#1d1d1d', arch: true, band: '#c9b186' },
+    { name: 'res_beige_arch', base: '#e3cfa8', frame: '#7a5638', glass: '#5c6f80', band: '#c9b186' },
     { name: 'res_grey_modern', base: '#b9bcbe', frame: '#1f1f1f', glass: '#2f3e4c', band: '#5c5f62', stone: '#6a6d70' },
-    { name: 'res_peach', base: '#e9c8a8', frame: '#ffffff', glass: '#5d7085', grill: '#3a2a20', band: '#d9ae88' },
-    { name: 'res_brick', base: '#9c5a3e', frame: '#e8e0d0', glass: '#4d5f70', grill: '#222', band: '#e3d8c4' },
+    { name: 'res_peach', base: '#e9c8a8', frame: '#ffffff', glass: '#5d7085', band: '#d9ae88' },
+    { name: 'res_brick', base: '#9c5a3e', frame: '#e8e0d0', glass: '#4d5f70', band: '#e3d8c4' },
   ];
   for (const s of resStyles) {
     atlas.facadeResidential.push(s.name);
