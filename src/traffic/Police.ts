@@ -46,6 +46,8 @@ export class Police {
   onEvent: ((e: PoliceEvent) => void) | null = null;
   /** nearest siren: distance (m) and left/right pan -1..1, for the audio engine */
   nearest = { dist: Infinity, pan: 0 };
+  private readonly q = new THREE.Quaternion();
+  private readonly yAxis = new THREE.Vector3(0, 1, 0);
   private readonly bodyMat = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.4, metalness: 0.5 });
   private readonly whiteMat = new THREE.MeshStandardMaterial({ color: 0xe9ecef, roughness: 0.45, metalness: 0.3 });
   private readonly glassMat = new THREE.MeshStandardMaterial({ color: 0x0b1118, roughness: 0.1, metalness: 0.8 });
@@ -233,7 +235,7 @@ export class Police {
       c.group.position.set(c.x, 0.02, c.z);
       c.group.rotation.y = c.heading;
       c.body?.setNextKinematicTranslation({ x: c.x, y: 0.02, z: c.z });
-      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), c.heading);
+      const q = this.q.setFromAxisAngle(this.yAxis, c.heading);
       c.body?.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
       // light bar flashes alternate red / blue
       const on = Math.floor((this.flash + c.phase) * 7) % 2 === 0;

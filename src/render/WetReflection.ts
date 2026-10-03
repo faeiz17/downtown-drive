@@ -21,6 +21,8 @@ export class WetReflection {
   private v = new THREE.Vector3();
   private t = new THREE.Vector3();
   private rot = new THREE.Matrix4();
+  private cp = new THREE.Vector3();
+  private look = new THREE.Vector3();
   private size = new THREE.Vector2();
   hide: THREE.Object3D[] = [];
 
@@ -40,11 +42,11 @@ export class WetReflection {
     if (this.rt.width !== w || this.rt.height !== h) this.rt.setSize(w, h);
     const cam = this.camera;
     cam.updateMatrixWorld();
-    const cp = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+    const cp = this.cp.setFromMatrixPosition(cam.matrixWorld);
     // mirror the camera in the road plane (same construction as three's Reflector)
     this.v.subVectors(this.p, cp).reflect(this.n).negate().add(this.p);
     this.rot.extractRotation(cam.matrixWorld);
-    const look = new THREE.Vector3(0, 0, -1).applyMatrix4(this.rot).add(cp);
+    const look = this.look.set(0, 0, -1).applyMatrix4(this.rot).add(cp);
     this.t.subVectors(this.p, look).reflect(this.n).negate().add(this.p);
     const vc = this.cam;
     vc.position.copy(this.v);

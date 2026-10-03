@@ -4,6 +4,7 @@
 import type { WorldData } from '../data/types';
 import { Minimap } from './Minimap';
 import { RainOverlay } from './RainOverlay';
+import type { RainLens } from '../render/RainLens';
 
 export interface HudState {
   kmh: number;
@@ -68,7 +69,7 @@ export class HUD {
   private lastGear = '';
   private dpr: number;
 
-  constructor(parent: HTMLElement, world: WorldData) {
+  constructor(parent: HTMLElement, world: WorldData, lens: RainLens) {
     this.root = document.createElement('div');
     this.root.className = 'hud';
     this.root.innerHTML = `
@@ -93,7 +94,7 @@ export class HUD {
       <div class="hud-fps"></div>
       <div class="hud-toast"></div>`;
     parent.appendChild(this.root);
-    this.rainOverlay = new RainOverlay(this.root);
+    this.rainOverlay = new RainOverlay(this.root, lens);
     this.minimap = new Minimap(world, 210);
     this.root.querySelector('.hud-map')!.prepend(this.minimap.canvas);
     this.gauge = this.root.querySelector('.hud-gauge') as HTMLCanvasElement;

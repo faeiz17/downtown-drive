@@ -158,7 +158,7 @@ export class Game {
     this.renderer.taa.setDynamicRoot(this.car.object);
     this.scene.add(this.car.object);
     this.rig = new CameraRig(this.camera, this.physics);
-    this.hud = new HUD(ui, this.data);
+    this.hud = new HUD(ui, this.data, this.renderer.rainLens);
     this.hud.visible = false;
     this.menu = new Menu(ui, this.settings, {
       onPlay: () => this.play(),
@@ -482,7 +482,9 @@ export class Game {
       this.telemetry.distance += Math.abs(v.speed) * dt;
       const L = car.visual.lights;
       const blink = car.visual.blinkPhase;
-      this.hud.rainOverlay.update(dt, this.rain, v.groundKmh, this.rig.mode === 'interior' || this.rig.mode === 'hood');
+      this.renderer.setLensRain(this.rain > 0.03 && this.quality.reflections);
+      this.renderer.rainLens.update(dt, this.rain, v.groundKmh, this.rig.mode === 'interior' || this.rig.mode === 'hood', this.rig.mode === 'interior');
+      this.hud.rainOverlay.update();
       this.hud.update(dt, {
         kmh: v.groundKmh, rpm: v.drivetrain.rpm, redline: v.drivetrain.redline, gear: v.drivetrain.gearLabel, nitro: v.nitro, nitroActive: v.nitroActive,
         driftScore: v.driftScore, driftBanked: v.driftBanked, driftBankedCount: v.driftBankedCount,

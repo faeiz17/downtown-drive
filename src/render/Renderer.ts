@@ -8,6 +8,7 @@ import {
 import { N8AOPostPass } from 'n8ao';
 import { MotionBlurEffect } from './MotionBlurEffect';
 import { TAAPass } from './TAAPass';
+import { RainLens, RainLensEffect } from './RainLens';
 import { createGradeLUT, LAHORE_GRADE, type GradeParams } from './Grade';
 import type { QualityPreset } from './Quality';
 
@@ -21,7 +22,9 @@ export class Renderer {
   private renderPass: RenderPass;
   private aoPass: N8AOPostPass;
   readonly taa: TAAPass;
+  readonly rainLens = new RainLens();
   private mbPass: EffectPass;
+  private rainPass: EffectPass;
   private mainPass: EffectPass;
   private smaaPass: EffectPass;
   quality!: QualityPreset;
@@ -64,6 +67,11 @@ export class Renderer {
     // Motion blur and the NaN/HDR sanitiser share one full-screen pass. The sanitiser must run in a pass BEFORE
     // bloom: bloom builds its mip chain from its own pass's raw input, so a clamp inside the bloom pass would not
     // stop a single NaN pixel (full-screen black flash) or a sun glint on the clearcoat (white flash).
+    // water on the lens bends the picture (edits UVs, so it cannot share a pass with the convolution-style motion blur);
+    // the pass is switched off while it is dry
+    this.rainPass = new EffectPass(camera, new RainLensEffect(this.rainLens));
+    this.rainPass.enabled = false;
+    this.composer.addPass(this.rainPass);
     this.mbPass = new EffectPass(camera, this.motionBlur, new SanitizeEffect(4.0));
     this.composer.addPass(this.mbPass);
     this.bloom = new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1.55, luminanceSmoothing: 0.35, intensity: 0.35, radius: 0.42 });
@@ -77,12 +85,18 @@ export class Renderer {
     this.composer.addPass(this.smaaPass);
   }
 
+  /** lens drops on/off (only while it rains) */
+  setLensRain(on: boolean): void {
+    this.rainPass.enabled = on;
+  }
+
   setCamera(camera: THREE.PerspectiveCamera): void {
     this.camera = camera;
     this.renderPass.mainCamera = camera;
     this.aoPass.camera = camera;
     this.taa.renderCamera = camera;
     this.mbPass.mainCamera = camera;
+    this.rainPass.mainCamera = camera;
     this.mainPass.mainCamera = camera;
     this.smaaPass.mainCamera = camera;
   }
@@ -105,7 +119,7 @@ export class Renderer {
     // SMAA is the fallback when TAA is off (it cannot fix sub-pixel crawl, TAA can)
     this.smaaPass.enabled = q.smaa && !q.taa;
     // postprocessing only presents the pass flagged renderToScreen: make it the last *enabled* pass
-    const passes = [this.renderPass, this.aoPass, this.taa, this.mbPass, this.mainPass, this.smaaPass];
+    const passes = [this.renderPass, this.aoPass, this.taa, this.rainPass, this.mbPass, this.mainPass, this.smaaPass];
     passes.forEach((p) => (p.renderToScreen = false));
     [...passes].reverse().find((p) => p.enabled)!.renderToScreen = true;
     this.gpuHistN = 0;

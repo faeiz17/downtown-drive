@@ -28,7 +28,12 @@ export async function withGame<T>(fn: (open: (query: string, w?: number, h?: num
       });
       page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
       await page.goto(`http://localhost:${port}/?${query}`, { waitUntil: 'load' });
-      await page.waitForFunction(() => !!(window as any).__game && ((window as any).__game.mode !== 'loading'), null, { timeout: 120_000 });
+      try {
+        await page.waitForFunction(() => !!(window as any).__game && ((window as any).__game.mode !== 'loading'), null, { timeout: 60_000 });
+      } catch (e) {
+        console.error('Game did not finish loading. Console output:\n' + errors.slice(0, 12).join('\n'));
+        throw e;
+      }
       return page;
     };
     const result = await fn(open);
