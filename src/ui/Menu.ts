@@ -96,6 +96,8 @@ export class Menu {
           </div>
           <label>Rain</label>
           <div class="seg" data-k="rain"><button data-v="true" class="${s.rain ? 'on' : ''}">On</button><button data-v="false" class="${!s.rain ? 'on' : ''}">Off</button></div>
+          <label>Police pursuit</label>
+          <div class="seg" data-k="police"><button data-v="true" class="${s.police ? 'on' : ''}">On</button><button data-v="false" class="${!s.police ? 'on' : ''}">Off</button></div>
           <label>Smog / haze <span class="val" data-for="smog">${Math.round(s.smog * 100)}%</span></label>
           <input type="range" data-k="smog" min="0.2" max="2" step="0.05" value="${s.smog}">
           <label>Traffic density <span class="val" data-for="traffic">${Math.round(s.traffic * 100)}%</span></label>

@@ -47,6 +47,7 @@ export class HUD {
   private g: CanvasRenderingContext2D;
   private face: HTMLCanvasElement; // static dial face, drawn once
   private gearEl: HTMLDivElement;
+  private wantedEl: HTMLDivElement;
   private boostEl: HTMLDivElement;
   private speedEl: HTMLDivElement;
   private unitEl: HTMLDivElement;
@@ -72,6 +73,7 @@ export class HUD {
     this.root.className = 'hud';
     this.root.innerHTML = `
       <div class="hud-boostfx"></div>
+      <div class="hud-wanted"></div>
       <div class="hud-street"></div>
       <div class="hud-drift"><span class="hud-drift-label">DRIFT</span><span class="hud-drift-num">0</span></div>
       <div class="hud-map"><div class="hud-attrib">© OpenStreetMap contributors</div></div>
@@ -103,6 +105,7 @@ export class HUD {
     this.face.width = this.face.height = SIZE * this.dpr;
     this.drawFace();
     this.gearEl = this.root.querySelector('.hud-gear') as HTMLDivElement;
+    this.wantedEl = this.root.querySelector('.hud-wanted') as HTMLDivElement;
     this.boostEl = this.root.querySelector('.hud-boostfx') as HTMLDivElement;
     this.speedEl = this.root.querySelector('.hud-speed') as HTMLDivElement;
     this.unitEl = this.root.querySelector('.hud-unit') as HTMLDivElement;
@@ -125,6 +128,12 @@ export class HUD {
     const show = el.style.display === 'none';
     el.style.display = show ? '' : 'none';
     return show;
+  }
+
+  /** pursuit badge: level 0 hides it. progress 0..1 fills the bar (escape or bust, whichever is closer). */
+  setPursuit(level: number, text: string): void {
+    this.wantedEl.classList.toggle('show', level > 0);
+    if (level > 0) this.wantedEl.innerHTML = `<span class="stars">${'★'.repeat(level)}<i>${'★'.repeat(4 - level)}</i></span><b>${text}</b>`;
   }
 
   toast(msg: string, seconds = 2.2): void {

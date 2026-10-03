@@ -8,6 +8,7 @@ export interface Settings {
   quality: QualityName;
   scene: SceneName; // fixed time of day (no cycle)
   rain: boolean;
+  police: boolean;
   smog: number; // 0.3 – 2
   traffic: number; // density multiplier 0 – 1.5
   masterVolume: number;
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quality: 'medium',
   scene: 'evening',
   rain: false,
+  police: true,
   smog: 1,
   traffic: 1,
   masterVolume: 0.8,

@@ -65,6 +65,8 @@ export class AudioEngine {
   private nextThunder = 12;
   private squealLevel = 0;
   private windBoost = 0;
+  private siren: { osc: OscillatorNode; osc2: OscillatorNode; gain: GainNode; pan: StereoPannerNode } | null = null;
+  private sirenT = 0;
   private road: NoiseVoice;
   private wind: NoiseVoice;
   private spray: NoiseVoice;
@@ -267,6 +269,40 @@ export class AudioEngine {
       this.bird();
       this.nextBird = 3 + Math.random() * 8;
     }
+  }
+
+  /** Police siren: a two-oscillator wail that swells as the nearest car closes in (dist = Infinity silences it). */
+  setSiren(dt: number, dist: number, pan: number, interior: boolean): void {
+    if (this.ctx.state !== 'running') return;
+    const ctx = this.ctx;
+    if (!this.siren) {
+      const osc = ctx.createOscillator(), osc2 = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc2.type = 'square';
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1300;
+      bp.Q.value = 0.8;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      const p = ctx.createStereoPanner();
+      osc.connect(bp);
+      osc2.connect(bp);
+      bp.connect(gain).connect(p).connect(this.sfxBus);
+      osc.start();
+      osc2.start();
+      this.siren = { osc, osc2, gain, pan: p };
+    }
+    this.sirenT += dt;
+    // classic wail: 650 → 1450 Hz, about 1.2 s per sweep
+    const ph = (this.sirenT * 0.85) % 1;
+    const f = 650 + 800 * Math.sin(Math.PI * ph) ** 1.4;
+    const t = ctx.currentTime;
+    this.siren.osc.frequency.setTargetAtTime(f, t, 0.02);
+    this.siren.osc2.frequency.setTargetAtTime(f * 1.005, t, 0.02);
+    const vol = isFinite(dist) ? Math.min(0.2, 22 / Math.max(14, dist)) * (interior ? 0.5 : 1) : 0;
+    this.siren.gain.gain.setTargetAtTime(vol, t, 0.1);
+    this.siren.pan.pan.setTargetAtTime(pan, t, 0.1);
   }
 
   private envGain(peak: number, attack: number, hold: number, release: number): GainNode {

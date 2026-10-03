@@ -7,6 +7,7 @@ import { SunShadows } from '../render/SunShadows';
 import { Rain } from '../render/Rain';
 import { WetReflection } from '../render/WetReflection';
 import { Effects } from '../render/Effects';
+import { Police } from '../traffic/Police';
 import { NightLights } from '../render/NightLights';
 import { QUALITY, type QualityPreset } from '../render/Quality';
 import { World } from '../world/World';
@@ -38,6 +39,7 @@ export class Game {
   readonly rainFx: Rain;
   readonly wetFx: WetReflection;
   readonly fx: Effects;
+  readonly police: Police;
   /** soft cool light that follows the car after dark (constant light count: no shader recompiles) */
   private readonly carFill: THREE.PointLight;
   readonly physics: PhysicsWorld;
@@ -104,6 +106,12 @@ export class Game {
     this.traffic = new TrafficManager(data, this.physics, this.scene);
     this.nightLights = new NightLights(this.scene, this.world.lampHeads, 0);
     this.fx = new Effects(this.scene, this.world.lampHeads);
+    this.police = new Police(this.scene, this.physics, (x, z) => this.world.nearestRoad(x, z, 80));
+    this.police.onEvent = (e) => {
+      const msg = { started: 'POLICE PURSUIT!', escalated: 'MORE UNITS INBOUND', escaped: 'YOU ESCAPED', busted: 'BUSTED' }[e];
+      this.hud?.toast(msg, e === 'busted' || e === 'escaped' ? 3.2 : 2);
+      if (e === 'busted') this.resetCar();
+    };
     this.input = new Input(canvas);
     window.addEventListener('resize', () => this.renderer.resize());
     document.addEventListener('visibilitychange', () => {
@@ -178,6 +186,7 @@ export class Game {
     // every lit material has to know about the shadow cascades (see SunShadows)
     for (const m of this.world.litMaterials) this.shadows.patch(m);
     this.shadows.patchObject(this.scene);
+    this.shadows.patchObject(this.police.group);
     this.dayNight.update(0);
     this.shadows.update();
     this.world.setNight(this.dayNight.state.night);
@@ -277,6 +286,7 @@ export class Game {
     const off = e.oneway ? e.width / 2 - 1.8 : Math.min(e.width / 4, 2.2) + (e.median ?? 0) / 2;
     v.reset(r.x + lx * off * DRIVE_SIDE, r.z + lz * off * DRIVE_SIDE, Math.atan2(tx, tz));
     this.rig.snap();
+    this.police.clearTrail();
     this.hud.toast('Car reset');
   }
 
@@ -381,7 +391,7 @@ export class Game {
         maxF = Math.max(maxF, im.force);
         if (this.traffic.impact(im.handle1, im.handle2)) hitTraffic = true;
       }
-      void hitTraffic;
+      if (hitTraffic && this.mode === 'play' && this.settings.police) this.police.alert({ x: v.position.x, z: v.position.z, vx: v.velocity.x, vz: v.velocity.z, kmh: v.groundKmh, heading: v.heading });
       this.physics.impacts.length = 0;
       if (maxF > 8000 && this.impactCd <= 0) {
         const s = Math.min(1, maxF / 90000);
@@ -458,6 +468,7 @@ export class Game {
       const camFwd = this.camera.getWorldDirection(this.scratchFwd);
       this.traffic.update(dt, { x: v.position.x, z: v.position.z, hx: Math.sin(v.heading), hz: Math.cos(v.heading), speed: v.speed, vx: v.velocity.x, vz: v.velocity.z }, this.camera.position.x, this.camera.position.z, camFwd.x, camFwd.z);
       this.traffic.sync(night);
+      this.police.update(dt, { x: v.position.x, z: v.position.z, vx: v.velocity.x, vz: v.velocity.z, kmh: v.groundKmh, heading: v.heading }, this.mode === 'play' && this.settings.police);
       P.end();
     }
     this.world.update(this.camera.position.x, this.camera.position.z, carPos.x, carPos.z, dt, 6, P);
@@ -480,6 +491,7 @@ export class Game {
         x: carPos.x, z: carPos.z, heading: v.heading, camera: this.rig.mode,
       }, this.traffic.positions());
       P.end();
+      this.hud.setPursuit(this.police.level, this.police.level ? (isFinite(this.police.nearest.dist) ? `${Math.round(this.police.nearest.dist)} m` : 'PURSUIT') : '');
       P.begin('audio');
       const indicating = L.indicatorLeft || L.indicatorRight;
       const tick = indicating && blink !== this.lastBlink;
@@ -487,6 +499,7 @@ export class Game {
       const dtn = v.drivetrain;
       let skid = 0;
       for (const w of v.wheels) skid = Math.max(skid, w.skid);
+      this.audio?.setSiren(dt, this.police.nearest.dist, this.police.nearest.pan, this.rig.mode === 'interior');
       this.audio?.update(dt, {
         rpm: dtn.rpm, redline: dtn.redline, throttle: dtn.throttleEff, load: dtn.torqueOut / 480, boost: dtn.boost, nitro: v.nitroActive, limiting: dtn.limiting, shiftCount: dtn.shiftCount,
         speed: v.groundKmh / 3.6, slip: v.maxSlip, skid,
