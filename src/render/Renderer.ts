@@ -96,6 +96,9 @@ export class Renderer {
     this.aoPass.enabled = q.ssao;
     this.aoPass.setQualityMode(q.ssaoMode);
     this.aoPass.configuration.halfRes = true;
+    this.aoPass.configuration.aoSamples = 6;
+    this.aoPass.configuration.denoiseSamples = 2;
+    this.aoPass.configuration.denoiseRadius = 10;
     this.bloom.intensity = q.bloom ? 0.35 : 0;
     this.taa.enabled = q.taa;
     this.taa.invalidate();

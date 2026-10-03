@@ -1,6 +1,7 @@
 // Shared world materials.
 import * as THREE from 'three';
 import { WorldAtlas, noise } from './atlas';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { RNG } from '../core/rng';
 import { wetUniforms } from '../render/WetReflection';
 
@@ -8,14 +9,18 @@ import { wetUniforms } from '../render/WetReflection';
 const white = new THREE.DataTexture(new Uint8Array([200, 200, 200, 255]), 1, 1);
 white.needsUpdate = true;
 const detailUniform = { value: white as THREE.Texture };
-/** Real PBR concrete/plaster texture (Poly Haven, CC0) used as wall detail. */
-export function loadWallDetail(url: string): void {
-  new THREE.TextureLoader().load(url, (t) => {
+/**
+ * Real concrete/plaster texture (Poly Haven, CC0) used as wall detail. Stored as KTX2 (Basis ETC1S, 4× smaller than
+ * the JPEG and it stays compressed in GPU memory); the transcoder in public/basis picks the format the GPU supports.
+ */
+export function loadWallDetail(base: string, renderer: THREE.WebGLRenderer): void {
+  const loader = new KTX2Loader().setTranscoderPath(`${base}basis/`).detectSupport(renderer);
+  loader.load(`${base}textures/wall_detail.ktx2`, (t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 8;
-    t.colorSpace = THREE.NoColorSpace;
     detailUniform.value = t;
-  });
+    loader.dispose();
+  }, undefined, (e) => console.warn('wall detail texture failed', e));
 }
 
 export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMaterial {

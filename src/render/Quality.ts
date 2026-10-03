@@ -35,7 +35,7 @@ export const QUALITY: Record<QualityName, QualityPreset> = {
     drawDistance: 800, propNear: 140, propFar: 460, traffic: 45, pointLights: 0, headlightShadows: false, reflections: true,
   },
   high: {
-    name: 'high', pixelRatio: 1.25, minPixelRatio: 0.85, shadows: true, shadowMapSize: 2048, shadowRange: 200, ssao: true, ssaoMode: 'Performance', bloom: true, motionBlur: true, smaa: true, taa: true,
-    drawDistance: 1200, propNear: 190, propFar: 650, traffic: 70, pointLights: 3, headlightShadows: false, reflections: true,
+    name: 'high', pixelRatio: 1.15, minPixelRatio: 0.85, shadows: true, shadowMapSize: 1536, shadowRange: 200, ssao: true, ssaoMode: 'Performance', bloom: true, motionBlur: true, smaa: true, taa: true,
+    drawDistance: 1200, propNear: 160, propFar: 600, traffic: 70, pointLights: 3, headlightShadows: false, reflections: true,
   },
 };

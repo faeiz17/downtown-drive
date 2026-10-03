@@ -10,6 +10,7 @@ import { Effects } from '../render/Effects';
 import { NightLights } from '../render/NightLights';
 import { QUALITY, type QualityPreset } from '../render/Quality';
 import { World } from '../world/World';
+import { loadWallDetail } from '../world/materials';
 import { PhysicsWorld, type Rapier } from '../physics/PhysicsWorld';
 import { Car } from '../car/Car';
 import { loadLancerGltf } from '../car/CarVisual';
@@ -99,6 +100,7 @@ export class Game {
     this.scene.add(this.carFill);
     this.world = new World(data, this.physics);
     this.scene.add(this.world.scene);
+    loadWallDetail(import.meta.env.BASE_URL, this.renderer.renderer);
     this.traffic = new TrafficManager(data, this.physics, this.scene);
     this.nightLights = new NightLights(this.scene, this.world.lampHeads, 0);
     this.fx = new Effects(this.scene, this.world.lampHeads);

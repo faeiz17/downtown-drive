@@ -27,7 +27,7 @@ const measure = `(async () => {
   return out;
 })()`;
 const { result, errors } = await withGame(async (open) => {
-  const page = await open(`capture&autoplay&hour=16&quality=${quality}`, 1512, 945, 2);
+  const page = await open(`capture&autoplay&hour=16&quality=${quality}&rain=${process.env.RAIN ?? 0}`, 1512, 945, 2);
   await page.waitForTimeout(2500);
   return page.evaluate(measure);
 });

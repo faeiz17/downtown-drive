@@ -8,7 +8,7 @@ import { SpatialGrid, centroid, distPointSeg, projectPointSeg } from '../core/ge
 import { isMajor } from '../data/roadClasses';
 import { WorldAtlas } from './atlas';
 import { MeshBuilder, type V3 } from './meshBuilder';
-import { loadWallDetail, createAtlasMaterial, createAsphaltMaterial, createMarkingMaterial, createWaterMaterial, createWireMaterial } from './materials';
+import { createAtlasMaterial, createAsphaltMaterial, createMarkingMaterial, createWaterMaterial, createWireMaterial } from './materials';
 import { Signage } from './signage';
 import { prepareStrokes, emitAsphalt, emitMarkings, emitCurbs, type StrokePrep } from './roadGeom';
 import { layoutPlots, type PlotLayout } from './plots';
@@ -97,7 +97,6 @@ export class World {
     this.atlas.build();
     this.signage.build(data.shops.map((s) => s.name));
     this.atlasMat = createAtlasMaterial(this.atlas);
-    loadWallDetail(`${import.meta.env.BASE_URL}textures/wall_detail.jpg`);
     this.asphaltMat = createAsphaltMaterial();
     this.markMat = createMarkingMaterial();
     this.signMat = new THREE.MeshStandardMaterial({ map: this.signage.signTexture, emissiveMap: this.signage.signTexture, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.5 });
