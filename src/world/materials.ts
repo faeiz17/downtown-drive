@@ -9,21 +9,31 @@ import { wetUniforms } from '../render/WetReflection';
 const white = new THREE.DataTexture(new Uint8Array([200, 200, 200, 255]), 1, 1);
 white.needsUpdate = true;
 const detailUniform = { value: white as THREE.Texture };
+const brickUniform = { value: white as THREE.Texture };
+/** atlas rects (u0, v0) of the cells that are brick: those walls get the real brick texture */
+const brickCells = { value: [new THREE.Vector4(-1, -1, 0, 0), new THREE.Vector4(-1, -1, 0, 0), new THREE.Vector4(-1, -1, 0, 0)] };
 /**
  * Real concrete/plaster texture (Poly Haven, CC0) used as wall detail. Stored as KTX2 (Basis ETC1S, 4× smaller than
  * the JPEG and it stays compressed in GPU memory); the transcoder in public/basis picks the format the GPU supports.
  */
 export function loadWallDetail(base: string, renderer: THREE.WebGLRenderer): void {
   const loader = new KTX2Loader().setTranscoderPath(`${base}basis/`).detectSupport(renderer);
-  loader.load(`${base}textures/wall_detail.ktx2`, (t) => {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.anisotropy = 8;
-    detailUniform.value = t;
-    loader.dispose();
-  }, undefined, (e) => console.warn('wall detail texture failed', e));
+  const load = (file: string, target: { value: THREE.Texture }, srgb: boolean) =>
+    loader.load(`${base}textures/${file}`, (t) => {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 8;
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+      target.value = t;
+    }, undefined, (e) => console.warn(`${file} failed`, e));
+  load('wall_detail.ktx2', detailUniform, false);
+  load('brick.ktx2', brickUniform, true);
 }
 
 export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMaterial {
+  ['res_brick', 'com_brick', 'wall_brick'].forEach((n, i) => {
+    const c = atlas.cells[n];
+    if (c) brickCells.value[i].set(c.u0, c.v0, c.du, c.dv);
+  });
   const m = new THREE.MeshStandardMaterial({
     map: atlas.map,
     emissiveMap: atlas.emissive,
@@ -38,11 +48,13 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
   m.onBeforeCompile = (shader) => {
     patchWet(shader, true);
     shader.uniforms.tDetail = detailUniform;
+    shader.uniforms.tBrick = brickUniform;
+    shader.uniforms.uBrick = brickCells;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 cell;\nvarying vec4 vCell;\nvarying vec2 vTileUv;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvCell = cell;\nvTileUv = uv;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vCell;\nvarying vec2 vTileUv;\nuniform sampler2D tDetail;\nfloat winMask; vec3 roomCol; vec3 roomEmit;\nfloat rHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 17381.37); }')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vCell;\nvarying vec2 vTileUv;\nuniform sampler2D tDetail; uniform sampler2D tBrick; uniform vec4 uBrick[3];\nfloat winMask; vec3 roomCol; vec3 roomEmit;\nfloat rHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 17381.37); }')
       .replace(
         '#include <map_fragment>',
         `vec2 aT = clamp(fract(vTileUv), vec2(0.002), vec2(0.998));
@@ -58,6 +70,16 @@ export function createAtlasMaterial(atlas: WorldAtlas): THREE.MeshStandardMateri
            float dv = texture2D(tDetail, vWPos.zy * 0.33).r * bl.x + texture2D(tDetail, vWPos.xy * 0.33).r * bl.z + texture2D(tDetail, vWPos.xz * 0.33).r * bl.y;
            float wallMask = smoothstep(0.55, 0.2, abs(gN.y));
            diffuseColor.rgb *= mix(1.0, clamp(dv * 1.55, 0.55, 1.4), 0.75 * wallMask);
+           // brick facades: real brick (with mortar lines) wherever the facade art is brick-coloured
+           {
+             bool isBrick = false;
+             for (int bi = 0; bi < 3; bi++) if (abs(vCell.x - uBrick[bi].x) < 0.0004 && abs(vCell.y - uBrick[bi].y) < 0.0004) isBrick = true;
+             float red = smoothstep(0.0, 0.05, sampledDiffuseColor.r - sampledDiffuseColor.g * 1.1);
+             if (isBrick) {
+               vec3 bt = texture2D(tBrick, vWPos.zy * 0.45).rgb * bl.x + texture2D(tBrick, vWPos.xy * 0.45).rgb * bl.z + texture2D(tBrick, vWPos.xz * 0.45).rgb * bl.y;
+               diffuseColor.rgb = mix(diffuseColor.rgb, bt * 1.3, 0.85 * red * wallMask);
+             }
+           }
            // window panes (dark blue-grey glass in the facade art) become little rooms seen through the glass:
            // interior mapping, a box per bay with back wall, side walls, floor and ceiling, lit or dark per room
            winMask = 0.0; roomCol = vec3(0.0); roomEmit = vec3(0.0);
