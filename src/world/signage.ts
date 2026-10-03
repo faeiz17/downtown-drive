@@ -7,13 +7,13 @@ export const SIGN_COLS = 4, SIGN_ROWS = 32, SIGN_COUNT = SIGN_COLS * SIGN_ROWS;
 const SW = 512, SH = 64;
 
 const GENERIC_NAMES = [
-  'Al-Madina Traders', 'Lahore Mobile Centre', 'Punjab Sweets & Bakers', 'Butt Karahi', 'Shan Electronics', 'Hafiz Cloth House',
-  'Al-Rehman Pharmacy', 'Gulberg Opticians', 'Chaudhry Motors', 'Star Tailors', 'New Kashmir Dry Cleaners', 'Madni General Store',
-  'Royal Shoes', 'Bismillah Hardware', 'City Boutique', 'Crown Jewellers', 'Liberty Bags', 'Café Chai Khana', 'Rizwan Book Depot',
-  'Sheikh Carpets', 'Lahori Nashta', 'Afzal Electronics', 'Zam Zam Juice Corner', 'Friends Photo Studio', 'Iqbal Paints',
-  'Model Town Travels', 'Qureshi Kebab House', 'Noor Fabrics', 'Awan Property Advisors', 'Faisal Mobiles', 'Taj Furniture',
-  'Mughal Handicrafts', 'Sadiq Sanitary Store', 'Khan Tyres', 'Al-Fateh Stationers', 'Ravi Computers', 'Peshawari Chappal',
-  'Rehmat Fruit Shop', 'Anarkali Lawn House', 'Karachi Biryani', 'Desi Dhaba', 'Bhatti Auto Parts', 'Ali Watch Co.',
+  'Broadway Deli', 'Pacific Cell & Repair', 'Golden Gate Bakery', 'Sunset Pizza Co.', 'Metro Electronics', 'Olive Street Cafe',
+  'Bunker Hill Pharmacy', 'Spring St. Optical', 'Angel City Motors', 'Fashion District Outlet', 'Arts District Coffee', 'Grand Central Grocery',
+  'Hollywood Vinyl', 'Flower Market Co.', 'Little Tokyo Ramen', 'Union Hardware', 'City Lights Boutique', 'Crown Jewelers', 'Figueroa Books',
+  'Pico Tire & Auto', 'Taqueria El Sol', 'Echo Park Tattoo', 'Juice Bar 213', 'Skyline Fitness', 'Wilshire Dry Cleaners', 'Chinatown Noodle House',
+  'LA Live Tickets', 'Seventh Street Sports', 'Palm Realty', 'Downtown Wireless', 'Westlake Furniture', 'Mission Print & Copy',
+  'Santee Alley Shoes', 'Barber & Co.', 'Venice Surf Shop', 'Pacific Dental', 'Rodeo Watch Co.', 'Sushi Row', 'Bunker Vape & Tobacco',
+  'Main Street Liquor', 'Silver Lake Records', 'Lucky 8 Diner', 'City Hall Cafe',
 ];
 const URDU = ['دکان', 'مارکیٹ', 'سویٹس', 'ٹریڈرز', 'موبائل', 'فارمیسی', 'کپڑا', 'ہوٹل', 'بیکرز', 'الیکٹرونکس'];
 
@@ -88,7 +88,7 @@ function drawSign(ctx: CanvasRenderingContext2D, x: number, y: number, name: str
   ctx.strokeStyle = acc;
   ctx.lineWidth = 3;
   ctx.strokeRect(x + 3, y + 3, SW - 6, SH - 6);
-  const hasUrdu = rng.chance(0.45);
+  const hasUrdu = false; // (Lahore-era Urdu tagline switched off)
   ctx.fillStyle = fg;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -111,7 +111,7 @@ function drawSign(ctx: CanvasRenderingContext2D, x: number, y: number, name: str
   if (rng.chance(0.3)) {
     ctx.fillStyle = acc;
     ctx.font = 'bold 11px Arial';
-    ctx.fillText('0300-' + rng.int(1000000, 9999999), x + SW / 2, y + SH - 9);
+    ctx.fillText('(213) 555-' + rng.int(1000, 9999), x + SW / 2, y + SH - 9);
   }
 }
 

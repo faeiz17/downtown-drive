@@ -60,7 +60,7 @@ export function buildVehicleModels(): VehicleModel[] {
     const { paint, fixed, bodyH } = carBody(L, W, H, 1.2, 0.85, 0.52, 0.08);
     for (const x of [-0.74, 0.74]) for (const z of [-1.35, 1.3]) fixed.push(wheel(0.31, 0.2, x, z));
     const lights = [box(0.34, 0.1, 0.02, 0.58, bodyH - 0.12, L / 2 + 0.005, 0xfff4d6), box(0.34, 0.1, 0.02, -0.58, bodyH - 0.12, L / 2 + 0.005, 0xfff4d6), box(0.3, 0.12, 0.02, 0.62, bodyH - 0.1, -L / 2 - 0.005, 0xff1a0a), box(0.3, 0.12, 0.02, -0.62, bodyH - 0.1, -L / 2 - 0.005, 0xff1a0a)];
-    models.push({ kind: 'sedan', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 1, length: L, width: W, height: H, speedFactor: 1, palette: [0xf2f2f0, 0xf2f2f0, 0xc9ccd0, 0x9ea3a8, 0x1a1a1c, 0x2b3a55, 0x6e1d1d, 0x3d4a3e, 0xf2f2f0, 0xb8bcc0] });
+    models.push({ kind: 'sedan', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 1, length: L, width: W, height: H, speedFactor: 1, palette: [0xf2f2f0, 0xf2f2f0, 0xc9ccd0, 0x9ea3a8, 0x1a1a1c, 0x1a1a1c, 0x2b3a55, 0x7a1f1f, 0xf2c400, 0xf2c400, 0xf2c400, 0xb8bcc0] }); // incl. taxi yellow
   }
   // small hatch (Mehran / Alto / Cultus)
   {
@@ -130,11 +130,11 @@ export function buildVehicleModels(): VehicleModel[] {
       wheel(0.26, 0.16, 0.6, 1.05), wheel(0.26, 0.16, -0.6, 1.05), wheel(0.26, 0.16, 0.6, -1.1), wheel(0.26, 0.16, -0.6, -1.1),
     ];
     const lights = [box(0.2, 0.14, 0.02, 0.5, 0.75, 1.64, 0xfff4d6), box(0.2, 0.14, 0.02, -0.5, 0.75, 1.64, 0xfff4d6), box(0.14, 0.18, 0.02, 0.6, 0.7, -1.67, 0xff1a0a), box(0.14, 0.18, 0.02, -0.6, 0.7, -1.67, 0xff1a0a)];
-    models.push({ kind: 'pickup', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 1.15, length: L, width: W, height: 1.8, speedFactor: 0.85, palette: [0xf2f2f0, 0xf2f2f0, 0xdcdcdc, 0x2b4a7a] });
+    models.push({ kind: 'pickup', paint: merge(paint), fixed: merge(fixed), lights: merge(lights), massFactor: 1.15, length: L, width: W, height: 1.8, speedFactor: 0.85, palette: [0xf2f2f0, 0x1a1a1c, 0x8a1c1c, 0x4a5058, 0x2b4a7a, 0xdcdcdc] });
   }
   for (const m of models) for (const g of [m.paint, m.fixed, m.lights]) g.computeVertexNormals();
   return models;
 }
 
 /** Relative spawn weights reflecting Lahore's traffic mix. */
-export const KIND_WEIGHTS: Record<VehicleKind, number> = { sedan: 0.34, hatch: 0.22, rickshaw: 0.16, bike: 0.2, pickup: 0.08 };
+export const KIND_WEIGHTS: Record<VehicleKind, number> = { sedan: 0.42, hatch: 0.2, rickshaw: 0, bike: 0.07, pickup: 0.14 };
