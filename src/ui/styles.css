@@ -82,12 +82,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0c0f; col
 .menu.pause, .menu.settings, .menu.controls { background: var(--panel); padding: 28px 34px; border-radius: 14px; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 60px rgba(0,0,0,.6); max-height: 90vh; overflow: auto; }
 .menu h2 { margin: 0 0 18px; font-size: 28px; letter-spacing: 2px; }
 .menu.pause .menu-buttons button { text-align: center; }
-.settings-grid { display: grid; grid-template-columns: 300px 320px; gap: 12px 22px; align-items: center; text-align: left; }
+.settings-grid { display: grid; grid-template-columns: 300px 390px; gap: 12px 22px; align-items: center; text-align: left; }
 .settings-grid label { font-size: 14px; opacity: .92; }
 .settings-grid .val { float: right; color: var(--accent); font-variant-numeric: tabular-nums; }
 .settings-grid input[type=range] { width: 100%; accent-color: var(--accent); }
-.seg { display: flex; gap: 6px; }
-.seg button { flex: 1; padding: 8px 10px; font-size: 14px; text-align: center; }
+.seg { display: flex; gap: 5px; }
+.seg button { flex: 1 1 0; min-width: 0; padding: 8px 4px; font-size: 13px; letter-spacing: 0; text-align: center; white-space: nowrap; }
 .seg button:hover { transform: none; }
 .seg button.on { background: var(--accent); color: #111; border-color: var(--accent); }
 .controls-table { border-collapse: collapse; margin: 0 auto; font-size: 14px; text-align: left; }
