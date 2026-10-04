@@ -4,3 +4,4 @@ dist
 smoke-output
 *.log
 tools/ktx/
+showcase/

@@ -20,7 +20,7 @@ import { TrafficManager } from '../traffic/TrafficManager';
 import { AudioEngine } from '../audio/AudioEngine';
 import { HUD } from '../ui/HUD';
 import { Menu } from '../ui/Menu';
-import { Input } from './Input';
+import { Input, type DriveInput } from './Input';
 import { saveSettings, SCENE_HOURS, type Settings } from './Settings';
 import { isMajor } from '../data/roadClasses';
 import { leftNormal } from './geom2d';
@@ -80,6 +80,9 @@ export class Game {
   /** ?autopilot=<km/h>: follows the road network (benchmarks / attract mode) */
   autopilotKmh = parseFloat(new URLSearchParams(location.search).get('autopilot') ?? '0');
   private autopilotStuck = 0;
+  /** scripting hooks (scripts/cinematic.ts): override the camera just before rendering / the driver inputs */
+  cine: (() => void) | null = null;
+  scriptDrive: ((d: DriveInput) => void) | null = null;
   /** shown top-right on the HUD, e.g. "NIGHT · RAIN" */
   sceneLabel = '';
   /** weather: 0..1 rain falling, 0..1 road wetness (follows the rain with a delay) */
@@ -355,7 +358,7 @@ export class Game {
     const P = this.profiler;
     P.frameStart(t0);
     this.timer.update(t);
-    const dt = Math.min(0.1, this.timer.getDelta());
+    const dt = Math.max(0, Math.min(0.1, this.timer.getDelta()));
     this.fpsAcc += dt;
     this.fpsFrames++;
     if (this.fpsAcc > 0.5) {
@@ -365,6 +368,7 @@ export class Game {
     }
     this.input.update(dt);
     if (this.autopilotKmh > 0 && this.mode === 'play') this.autopilot();
+    this.scriptDrive?.(this.input.drive);
     this.handleActions();
     const car = this.car, v = car.vehicle;
     P.begin('physics');
@@ -515,6 +519,7 @@ export class Game {
     }
 
     // ---- render
+    this.cine?.();
     this.shadows.update();
     this.renderer.exposure = this.dayNight.exposure;
     const blur = this.mode === 'play' && (this.rig.mode === 'chase' || this.rig.mode === 'far') ? Math.min(1, Math.max(0, Math.max((v.groundKmh - 50) / 120, v.boostFx * 1.3))) * 0.8 : 0;
