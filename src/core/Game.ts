@@ -82,6 +82,10 @@ export class Game {
   private autopilotStuck = 0;
   /** scripting hooks (scripts/cinematic.ts): override the camera just before rendering / the driver inputs */
   cine: (() => void) | null = null;
+  /** extra lateral offset (m, + = towards the road's left edge in the travel direction) for the autopilot (overtakes) */
+  autoLateral = 0;
+  /** false = simulate without drawing (fast rehearsals) */
+  renderEnabled = true;
   scriptDrive: ((d: DriveInput) => void) | null = null;
   /** shown top-right on the HUD, e.g. "NIGHT · RAIN" */
   sceneLabel = '';
@@ -470,7 +474,9 @@ export class Game {
       P.end();
       P.begin('traffic');
       const camFwd = this.camera.getWorldDirection(this.scratchFwd);
-      this.traffic.update(dt, { x: v.position.x, z: v.position.z, hx: Math.sin(v.heading), hz: Math.cos(v.heading), speed: v.speed, vx: v.velocity.x, vz: v.velocity.z }, this.camera.position.x, this.camera.position.z, camFwd.x, camFwd.z);
+      const tcx = this.cine ? v.position.x : this.camera.position.x, tcz = this.cine ? v.position.z : this.camera.position.z;
+      const tfx = this.cine ? Math.sin(v.heading) : camFwd.x, tfz = this.cine ? Math.cos(v.heading) : camFwd.z;
+      this.traffic.update(dt, { x: v.position.x, z: v.position.z, hx: Math.sin(v.heading), hz: Math.cos(v.heading), speed: v.speed, vx: v.velocity.x, vz: v.velocity.z }, tcx, tcz, tfx, tfz);
       this.traffic.sync(night);
       this.police.update(dt, { x: v.position.x, z: v.position.z, vx: v.velocity.x, vz: v.velocity.z, kmh: v.groundKmh, heading: v.heading }, this.mode === 'play' && this.settings.police);
       P.end();
@@ -525,7 +531,7 @@ export class Game {
     const blur = this.mode === 'play' && (this.rig.mode === 'chase' || this.rig.mode === 'far') ? Math.min(1, Math.max(0, Math.max((v.groundKmh - 50) / 120, v.boostFx * 1.3))) * 0.8 : 0;
     P.begin('render');
     this.wetFx.render(this.quality.reflections ? this.wet : 0, dt);
-    this.renderer.render(dt, blur);
+    if (this.renderEnabled) this.renderer.render(dt, blur);
     P.end();
     this.frameMs = performance.now() - t0;
     if (this.renderer.gpuMs) P.add('gpu', this.renderer.gpuMs);
@@ -557,7 +563,8 @@ export class Game {
     }
     const [lx, lz] = leftNormal(tx, tz);
     const off = e.oneway ? e.width / 2 - 1.7 : Math.min(e.width / 4, 2.2) + (e.median ?? 0) / 2;
-    const gx = r.x + lx * off * DRIVE_SIDE + tx * 4 - v.position.x, gz = r.z + lz * off * DRIVE_SIDE + tz * 4 - v.position.z;
+    const lat = off * DRIVE_SIDE + this.autoLateral;
+    const gx = r.x + lx * lat + tx * 4 - v.position.x, gz = r.z + lz * lat + tz * 4 - v.position.z;
     let err = Math.atan2(gx, gz) - h;
     err = Math.atan2(Math.sin(err), Math.cos(err));
     d.steer = Math.max(-1, Math.min(1, -err * 2.2));

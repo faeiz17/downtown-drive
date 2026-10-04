@@ -111,6 +111,11 @@ export class RainLens {
     this.render();
   }
 
+  /** a large drop on the glass at a screen position (fractions, y down) that starts running */
+  spawnBig(fx: number, fy: number, r = 20): void {
+    this.drops.push({ x: fx * W, y: fy * H, r, vy: 0, age: 0, run: 0.3 });
+  }
+
   private stamp(cx: number, cy: number, r: number, strength: number, tail: boolean): void {
     const d = this.data;
     const x0 = Math.max(0, Math.floor(cx - r - 1)), x1 = Math.min(W - 1, Math.ceil(cx + r + 1));

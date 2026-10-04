@@ -78,6 +78,7 @@ const wrapPi = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class Vehicle {
   readonly body: RAPIER.RigidBody;
+  private chassis: RAPIER.Collider[] = [];
   readonly wheels: WheelState[] = [];
   readonly drivetrain = new Drivetrain();
   readonly position = new THREE.Vector3();
@@ -145,8 +146,7 @@ export class Vehicle {
     const cg = groups(GROUP.PLAYER, GROUP.STATIC | GROUP.TRAFFIC);
     const lower = R.ColliderDesc.roundCuboid(0.78, 0.18, 2.1, 0.06).setTranslation(0, 0.56, -0.02).setDensity(0).setFriction(0.08).setRestitution(0.15).setCollisionGroups(cg).setActiveEvents(R.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(3000);
     const cabin = R.ColliderDesc.roundCuboid(0.66, 0.2, 1.05, 0.08).setTranslation(0, 1.08, -0.4).setDensity(0).setFriction(0.1).setCollisionGroups(cg);
-    physics.world.createCollider(lower, this.body);
-    physics.world.createCollider(cabin, this.body);
+    this.chassis.push(physics.world.createCollider(lower, this.body), physics.world.createCollider(cabin, this.body));
 
     // suspension setup: static wheel-centre height = SPEC.wheelY; 54 % of the weight on the front axle
     const g = 9.81;
@@ -166,6 +166,12 @@ export class Vehicle {
       });
     }
     this.syncState();
+  }
+
+  /** Ghost mode (cinematics): the chassis passes through buildings and props; wheels still ride the ground. */
+  setGhost(on: boolean): void {
+    const cg = groups(GROUP.PLAYER, on ? GROUP.TRAFFIC : GROUP.STATIC | GROUP.TRAFFIC);
+    for (const c of this.chassis) c.setCollisionGroups(cg);
   }
 
   private syncState() {

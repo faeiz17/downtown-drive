@@ -244,6 +244,8 @@ export class Effects {
   readonly skid: SkidMarks;
   private flares: LampFlares;
   private acc = [0, 0, 0, 0];
+  /** 0..1: force tyre smoke and skid marks on every wheel in contact (cinematics / replayed drifts) */
+  force = 0;
   private splashAcc = 0;
   private readonly fwd = new THREE.Vector3();
   /** set by Game each frame: 0..1 daylight, so smoke is lit white by day and dark grey at night */
@@ -275,7 +277,8 @@ export class Effects {
     // --- per wheel: skid marks, smoke, spray
     for (let i = 0; i < 4; i++) {
       const w = v.wheels[i];
-      const sliding = w.contact && !w.onGrass ? Math.min(1, Math.max(0, (w.skid - 3.2) / 9)) : 0;
+      let sliding = w.contact && !w.onGrass ? Math.min(1, Math.max(0, (w.skid - 3.2) / 9)) : 0;
+      if (this.force > 0 && w.contact && (i >= 2 || this.force > 0.6)) sliding = Math.max(sliding, this.force);
       this.skid.add(i, w.point.x, w.contact ? w.point.y : 0, w.point.z, dirx, dirz, w.contact ? sliding : 0, 0.12);
       if (sliding > 0.05) {
         this.acc[i] += dt * (24 + 60 * sliding);

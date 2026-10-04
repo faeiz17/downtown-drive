@@ -394,6 +394,14 @@ export class TrafficManager {
     }
   }
 
+  /** deterministic restart (cinematics): remove every car and restart the random sequence */
+  reseed(seed: number): void {
+    this.clear();
+    this.rng = new RNG(seed);
+    this.spawnTimer = 0;
+    this.time = 0;
+  }
+
   clear(): void {
     while (this.vehicles.length) this.removeVehicle(this.vehicles.length - 1);
   }
