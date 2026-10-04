@@ -201,7 +201,7 @@
       } else g.autoLateral *= 0.92;
     },
     shots: [
-      { id: 'M1-wheel-track', t0: 0, t1: 1.333, cam(u, t) { T.look(T.L(1.95, 0.36, 1.6), T.L(0.74, 0.32, 1.3), 30, { shake: 0.012, fill: 140 }); } },
+      { id: 'M1-wheel-track', t0: 0, t1: 1.333, cam(u, t) { T.look(T.L(1.95, 0.36, 1.6), T.L(0.74, 0.32, 1.3), 30, { shake: 0.012, fill: 80 }); } },
       { id: 'M2-drone-follow', t0: 1.333, t1: 2.667, cam(u, t) { T.look(T.L(lerp(-2, 2, u), 22 + 4 * u, -7 + 3 * u), T.L(0, 0, 4), 46, { roll: 0.14 * (u - 0.5), noClip: true }); } },
       { id: 'M3-whip-pan', t0: 2.667, t1: 3.556, enter(st) { st.p = T.L(7.2, 1.0, 30); },
         cam(u, t, st) { T.look(st.p, T.L(0, 0.7, 2.5), 26 + 6 * u, { noClip: true }); } },
@@ -310,7 +310,7 @@
     },
     drive(t, d) { d.nitro = t > -0.4; },
     shots: [
-      { id: 'C1-wheel', t0: 0, t1: 0.444, cam() { T.look(T.L(1.8, 0.33, 1.6), T.L(0.74, 0.32, 1.3), 28, { shake: 0.012, fill: 140 }); } },
+      { id: 'C1-wheel', t0: 0, t1: 0.444, cam() { T.look(T.L(1.8, 0.33, 1.6), T.L(0.74, 0.32, 1.3), 28, { shake: 0.012, fill: 80 }); } },
       { id: 'C2-bumper', t0: 0.444, t1: 0.889, cam() { T.look(T.L(0.4, 0.45, 2.6), T.L(0, 0.7, 25), 82, { shake: 0.025, noClip: true }); } },
       { id: 'C3-overhead', t0: 0.889, t1: 1.333, cam() { T.look(T.L(0, 20, -2), T.L(0, 0, 5), 50, { noClip: true }); } },
       { id: 'C4-whip', t0: 1.333, t1: 1.778, enter(st) { st.p = T.L(-6.5, 0.9, 22); }, cam(u, t, st) { T.look(st.p, T.L(0, 0.7, 2.5), 26, { noClip: true }); } },

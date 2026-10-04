@@ -11,6 +11,11 @@
   T.init = (portrait) => {
     g.renderer.renderer.setAnimationLoop(null);
     g.renderer.dynamicResolution = false;
+    // dynamic resolution may already have lowered the pixel ratio while the page was loading: pin it to 1.0 for filming
+    g.renderer.pendingPixelRatio = 0;
+    g.renderer.pixelRatio = 1;
+    g.renderer.renderer.setPixelRatio(1);
+    g.renderer.resize();
     g.hud.visible = false;
     g.settings.police = false;
     g.mode = 'play';

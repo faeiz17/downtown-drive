@@ -102,6 +102,17 @@ You spawn on Main Boulevard Gulberg beside Mega Tower (63-B, next to KFC), in th
 
 The world is compiled once to `public/world/gulberg.world.json` and loaded from disk, so play does not need the network. Geometry is chunked, props are instanced with a near/far LOD, and static colliders stream with the car.
 
+## Trailer
+
+`npm run` equivalents (all via tsx): `scripts/trailer.ts preview|render|post [landscape|portrait]`. `render` plays 13 scripted sequences
+frame by frame in headless Chrome (drifts are ghost-mode takes validated against prop clearance), `post` grades, adds the title, mixes audio
+and encodes `showcase/downtown-drive-trailer-45s.mp4` (plus `-vertical.mp4`). `scripts/cinematic.ts` is unchanged.
+
+**Music and SFX.** The music (135 BPM, drops at 4 s and 36 s) is composed procedurally in `scripts/trailer/audio.py`; no third-party music.
+SFX samples (CC0): Freesound #496171 (editboy23, engine), #71739 (audible-edge, squeal), #105351 (CeebFrack, backfire),
+#404333 (strexet, nitro), #156994 (chrscrwfrd18, rain), #581125 (Fission9, thunder). HDRIs and textures: Poly Haven (CC0).
+The title URL is a placeholder; billboard brands are invented.
+
 ## Attribution
 
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available under the [Open Database License](https://opendatacommons.org/licenses/odbl/) (ODbL). Buildings, trees, lamps, and shop signage that are not in the extract are procedural.

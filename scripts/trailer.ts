@@ -208,7 +208,17 @@ async function post() {
   const meas = execSync(`ffmpeg -v info -i ${raw} -af loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json -f null - 2>&1 | sed -n '/^{/,/^}/p'`).toString();
   const j = JSON.parse(meas);
   const mastered = `${root}/audio.wav`;
-  execSync(`ffmpeg -v error -y -i ${raw} -af "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true,alimiter=limit=0.89" -ar 48000 ${mastered}`);
+  execSync(`ffmpeg -v error -y -i ${raw} -af "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true,alimiter=limit=0.89:level=disabled" -ar 48000 ${mastered}`);
+  // loudnorm leaves a little headroom error after the limiter: measure the result and trim to -14.0 LUFS
+  const lufs = (f: string) => parseFloat((execSync(`ffmpeg -nostats -i ${f} -af ebur128 -f null - 2>&1 | grep -A3 Summary | grep "I:" | awk '{print $2}'`).toString().trim()) || '-14');
+  for (let pass = 0; pass < 3; pass++) {
+    const delta = -14 - lufs(mastered);
+    if (Math.abs(delta) <= 0.2) break;
+    const trimmed = `${root}/audio-trim.wav`;
+    execSync(`ffmpeg -v error -y -i ${mastered} -af "volume=${delta.toFixed(2)}dB,alimiter=limit=0.89:level=disabled" ${trimmed}`);
+    execSync(`mv ${trimmed} ${mastered}`);
+  }
+  console.log(`audio integrated loudness ${lufs(mastered).toFixed(1)} LUFS`);
   const final = portrait ? 'showcase/downtown-drive-trailer-45s-vertical.mp4' : 'showcase/downtown-drive-trailer-45s.mp4';
   execSync(`ffmpeg -v error -y -i ${vout} -i ${mastered} -c:v copy -c:a aac -b:a 320k -t ${total.toFixed(3)} -movflags +faststart ${final}`);
   console.log('wrote', final);
