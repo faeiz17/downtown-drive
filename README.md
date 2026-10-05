@@ -111,7 +111,7 @@ and encodes `showcase/downtown-drive-trailer-45s.mp4` (plus `-vertical.mp4`). `s
 **Music and SFX.** The music (135 BPM, drops at 4 s and 36 s) is composed procedurally in `scripts/trailer/audio.py`; no third-party music.
 SFX samples (CC0): Freesound #496171 (editboy23, engine), #71739 (audible-edge, squeal), #105351 (CeebFrack, backfire),
 #404333 (strexet, nitro), #156994 (chrscrwfrd18, rain), #581125 (Fission9, thunder). HDRIs and textures: Poly Haven (CC0).
-The title URL is a placeholder; billboard brands are invented.
+Billboard brands are invented.
 
 ## Attribution
 

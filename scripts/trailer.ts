@@ -105,9 +105,9 @@ async function renderTitle(dir: string, frames: number, W: number, H: number): P
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   const lines = portrait ? ['DOWNTOWN', 'DRIVE'] : ['DOWNTOWN DRIVE'];
-  const size = portrait ? 205 : 190;
-  const top = portrait ? 0.27 * H : 0.33 * H;
-  const s1y = portrait ? top + size * 2.1 : top + size * 1.12;
+  const size = portrait ? 205 : 165;
+  const top = portrait ? 0.27 * H : 0.17 * H;
+  const s1y = portrait ? top + size * 2.1 : top + size * 1.2;
   await page.setContent(`<style>
     html,body{margin:0;background:transparent;width:${W}px;height:${H}px;overflow:hidden}
     .scrim{position:absolute;left:0;top:0;width:100%;height:100%;background:radial-gradient(ellipse 70% 38% at 50% ${portrait ? 40 : 52}%,rgba(0,0,0,.62),rgba(0,0,0,0) 72%)}
@@ -115,9 +115,8 @@ async function renderTitle(dir: string, frames: number, W: number, H: number): P
     .l{position:absolute;left:0;top:0;width:100%;transform-origin:50% 55%;white-space:nowrap}
     .sub{position:absolute;left:0;width:100%;text-align:center;font-family:"Arial Narrow","Helvetica Neue",Arial,sans-serif;font-weight:800;color:#fff;text-shadow:0 3px 12px rgba(0,0,0,.7)}
   </style><div class="scrim" id="scrim"></div><div class="wrap" id="w" style="height:${size * lines.length}px">${[0, 1, 2, 3, 4].map((k) => `<div class="l" id="l${k}">${lines.map((t) => `<div>${t}</div>`).join('')}</div>`).join('')}</div>
-  <div class="sub" id="s1" style="top:${s1y}px;font-size:${portrait ? 44 : 46}px;letter-spacing:10px;color:#ffd23f">NIGHT · RAIN · NITRO · NO BRAKES</div>
-  <div class="sub" id="s2" style="top:${s1y + (portrait ? 90 : 92)}px;font-size:${portrait ? 64 : 62}px;letter-spacing:14px">PLAY IN YOUR BROWSER</div>
-  <div class="sub" id="s3" style="top:${s1y + (portrait ? 190 : 184)}px;font-size:${portrait ? 34 : 36}px;letter-spacing:4px;opacity:.85">yourname.github.io/downtown-drive</div>`);
+  <div id="ics" style="position:absolute;left:0;top:${s1y}px;width:100%;display:flex;justify-content:center;gap:${portrait ? 44 : 78}px">${ICONS.map((ic, k) => `<div id="ic${k}" style="text-align:center;opacity:0"><svg width="${portrait ? 118 : 100}" height="${portrait ? 118 : 100}" viewBox="0 0 100 100" style="filter:drop-shadow(0 3px 8px rgba(0,0,0,.75))">${ic.svg}</svg><div style="font:800 ${portrait ? 25 : 22}px 'Arial Narrow',Arial,sans-serif;letter-spacing:4px;color:#fff;margin-top:8px;text-shadow:0 2px 8px #000">${ic.label}</div></div>`).join('')}</div>
+  <div class="sub" id="s2" style="top:${s1y + (portrait ? 220 : 164)}px;font-size:${portrait ? 64 : 50}px;letter-spacing:14px">PLAY IN YOUR BROWSER</div>`);
   await page.evaluate(`(() => {
     window.__t = (f) => {
       const t = f / 30, ease = (u) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3);
@@ -134,15 +133,51 @@ async function renderTitle(dir: string, frames: number, W: number, H: number): P
         set('l' + k, { opacity: glitching ? 1 : 0, clipPath: 'inset(' + a + '% 0 ' + (100 - b) + '% 0)', transform: 'translateX(' + ((rnd() - 0.5) * 2 * amp * 2.2) + 'px) scale(' + slam + ')' });
       }
       set('scrim', { opacity: Math.min(1, t * 6) });
-      set('s1', { opacity: Math.min(1, Math.max(0, (t - 0.9) * 5)) });
+      for (let k = 0; k < 4; k++) { const e = document.getElementById('ic' + k); const u = Math.min(1, Math.max(0, (t - 0.9 - k * 0.18) * 6)); e.style.opacity = u; e.style.transform = 'translateY(' + ((1 - u) * 18) + 'px) scale(' + (0.8 + 0.2 * u) + ')'; }
       set('s2', { opacity: Math.min(1, Math.max(0, (t - 1.5) * 5)) });
-      set('s3', { opacity: Math.min(0.85, Math.max(0, (t - 1.8) * 5)) });
     };
   })()`);
   for (let f = 0; f < frames; f++) {
     await page.evaluate(`window.__t(${f})`);
     await page.screenshot({ path: `${dir}/${String(f).padStart(4, '0')}.png`, omitBackground: true });
   }
+  await browser.close();
+}
+
+const W_ = '#fff';
+const ICONS = [
+  { label: 'NIGHT / DAY', svg: `<g fill="#ffd23f"><circle cx="30" cy="50" r="13"/>${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => `<rect x="28.5" y="22" width="3" height="9" rx="1.5" transform="rotate(${a} 30 50)"/>`).join('')}</g><path d="M82 30a24 24 0 1 0 6 36 20 20 0 0 1-6-36z" fill="${W_}"/>` },
+  { label: 'RAIN', svg: `<path d="M28 58a15 15 0 0 1 3-29 20 20 0 0 1 38-3 16 16 0 0 1 3 32z" fill="${W_}"/><g stroke="#35c8ff" stroke-width="5" stroke-linecap="round"><path d="M32 70l-5 14M50 70l-5 14M68 70l-5 14"/></g>` },
+  { label: 'NITRO', svg: `<path d="M58 6L22 56h24l-8 38 40-54H54z" fill="#35c8ff" stroke="${W_}" stroke-width="3" stroke-linejoin="round"/>` },
+  { label: 'NO BRAKES', svg: `<circle cx="50" cy="50" r="30" fill="none" stroke="${W_}" stroke-width="9"/><circle cx="50" cy="50" r="9" fill="${W_}"/><g fill="${W_}">${[0, 72, 144, 216, 288].map((a) => `<circle cx="50" cy="29" r="3.2" transform="rotate(${a} 50 50)"/>`).join('')}</g><circle cx="50" cy="50" r="44" fill="none" stroke="#ff2a3d" stroke-width="7"/><path d="M19 81L81 19" stroke="#ff2a3d" stroke-width="7" stroke-linecap="round"/>` },
+];
+
+// =============================================================================================== browser window
+/** Desktop + macOS-style Chrome window (opaque PNG); the game video is overlaid on the viewport area. */
+async function drawChrome(file: string, DW: number, DH: number, WX: number, WY: number, GW: number, GH: number, BAR: number): Promise<void> {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const page = await browser.newPage({ viewport: { width: DW, height: DH } });
+  await page.setContent(`<style>
+    *{box-sizing:border-box;margin:0} body{width:${DW}px;height:${DH}px;overflow:hidden;font-family:-apple-system,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+      background:radial-gradient(${DW * 0.6}px ${DH * 0.6}px at 78% 18%,#6f5cc9 0%,rgba(111,92,201,0) 60%),radial-gradient(${DW * 0.5}px ${DH * 0.7}px at 12% 90%,#1d6fa5 0%,rgba(29,111,165,0) 60%),linear-gradient(135deg,#1b1740,#30206b 45%,#0f3b63)}
+    .menubar{position:absolute;left:0;top:0;width:100%;height:28px;background:rgba(20,18,40,.55);color:#fff;font-size:13.5px;display:flex;align-items:center;padding:0 14px;gap:22px;white-space:nowrap;overflow:hidden}
+    .menubar b{font-weight:700}.menubar .r{margin-left:auto;display:flex;gap:18px;opacity:.95}
+    .win{position:absolute;left:${WX}px;top:${WY}px;width:${GW}px;height:${BAR + GH}px;border-radius:12px;background:#000;box-shadow:0 40px 90px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.18);overflow:hidden}
+    .tabs{height:44px;background:#dcdde1;display:flex;align-items:flex-end;padding:0 14px;position:relative}
+    .lights{position:absolute;left:16px;top:14px;display:flex;gap:8px}.lights i{width:13px;height:13px;border-radius:50%;display:block}
+    .tab{margin-left:78px;height:34px;width:248px;background:#f6f6f8;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:9px;padding:0 14px;font-size:13px;color:#222}
+    .tab .fav{width:16px;height:16px;border-radius:50%;background:#1d3658}.tab .x{margin-left:auto;color:#777;font-size:16px}
+    .plus{margin:0 0 7px 12px;color:#666;font-size:20px}
+    .tool{height:52px;background:#f6f6f8;display:flex;align-items:center;padding:0 16px;gap:16px;border-bottom:1px solid #d3d4d8;color:#6a6a70;font-size:19px}
+    .url{flex:1;height:34px;background:#e8e9ed;border-radius:17px;display:flex;align-items:center;padding:0 16px;font-size:14.5px;color:#222;gap:9px}.url span{color:#888}
+    .dot{width:26px;height:26px;border-radius:50%;background:#7a6cf0;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  </style>
+  <div class="menubar"><b>&#63743;</b><b>Chrome</b><span>File</span><span>Edit</span><span>View</span><span>History</span><span>Bookmarks</span><span>Window</span><span>Help</span>
+    <div class="r"><span>Sun 4 Oct&nbsp; 9:41 AM</span></div></div>
+  <div class="win"><div class="tabs"><div class="lights"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+      <div class="tab"><div class="fav"></div>Downtown Drive<span class="x">×</span></div><div class="plus">+</div></div>
+    <div class="tool"><span>←</span><span style="opacity:.45">→</span><span>⟳</span><div class="url"><span>🔒</span>localhost:5173</div><span>☆</span><span>⬇</span><div class="dot">F</div><span>⋮</span></div></div>`);
+  await page.screenshot({ path: file });
   await browser.close();
 }
 
@@ -174,7 +209,12 @@ async function post() {
   console.log(`frames ${frame} (${total.toFixed(3)} s), freeze at ${freezeStart.toFixed(3)}, title at ${titleT.toFixed(3)}, streak shots ${JSON.stringify(streak)}`);
   writeFileSync(`${dir}/timing.json`, JSON.stringify({ total, freezeStart, titleT, starts, streak }));
 
-  const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 804, OW = W, OH = portrait ? 1920 : 1080;
+  const W = portrait ? 1080 : 1920, H = portrait ? 1920 : 804, OW = W, OH = H;
+  // the finished video sits in a macOS Chrome window on a desktop (landscape 1920x1080, portrait 1080x1920)
+  const BAR = 96, DW = portrait ? 1080 : 1920, DH = portrait ? 1920 : 1080;
+  const GW = portrait ? 972 : 1760, GH = portrait ? 1728 : 736;
+  const WX = Math.round((DW - GW) / 2), WY = Math.round((DH + 28 - BAR - GH) / 2);
+  await drawChrome(`${dir}/chrome.png`, DW, DH, WX, WY, GW, GH, BAR);
   const tx = titleT;
   const dt = (a: number, b: number) => `between(t,${(tx + a).toFixed(3)},${(tx + b).toFixed(3)})`;
   await renderTitle(`${dir}/title`, Math.ceil((total - titleT) * 30) + 2, OW, OH);
@@ -197,12 +237,13 @@ async function post() {
     `[g0][bloom]blend=all_mode=screen:all_opacity=0.40[b1]`,
     // warm dawn look for the dawn drift shot, then film look: chromatic aberration, grain, vignette
     `[b1][flare]blend=all_mode=screen:all_opacity=0.55,colorbalance=rm=0.10:gm=0.02:bm=-0.10:rh=0.16:gh=0.05:bh=-0.14:rs=0.06:bs=-0.05:enable='between(t,${d2.toFixed(3)},${(d2 + 2.667).toFixed(3)})',format=yuv420p,rgbashift=rh=-2:bh=2:rv=0,noise=alls=8:allf=t+u,vignette=PI/4.6,unsharp=5:5:0.4[graded]`,
-    portrait ? `[graded]null[padded]` : `[graded]pad=${OW}:${OH}:0:${Math.round((OH - H) / 2)}:black[padded]`,
-    `[padded][1:v]overlay=eof_action=pass:format=auto,${flash.join(',')},fade=t=in:st=0:d=0.45:color=black[v]`,
+    `[graded]null[padded]`,
+    `[padded][1:v]overlay=eof_action=pass:format=auto,${flash.join(',')},scale=${GW}:${GH}[vs]`,
+    `[2:v][vs]overlay=${WX}:${WY + BAR}:format=auto,fade=t=in:st=0:d=0.45:color=black[v]`,
   ].join(';');
   writeFileSync(`${dir}/filter.txt`, filter);
   const vout = `${dir}/video.mp4`;
-  execSync(`ffmpeg -v error -y -f concat -safe 0 -i ${dir}/frames.txt -itsoffset ${titleT.toFixed(3)} -framerate 30 -i ${dir}/title/%04d.png -filter_complex "${filter}" -map "[v]" -c:v libx264 -preset slow -crf 19 -maxrate 32M -bufsize 64M -pix_fmt yuv420p -r 30 -t ${total.toFixed(3)} ${vout}`, { stdio: 'inherit' });
+  execSync(`ffmpeg -v error -y -f concat -safe 0 -i ${dir}/frames.txt -itsoffset ${titleT.toFixed(3)} -framerate 30 -i ${dir}/title/%04d.png -loop 1 -framerate 30 -i ${dir}/chrome.png -filter_complex "${filter}" -map "[v]" -c:v libx264 -preset slow -crf 19 -maxrate 32M -bufsize 64M -pix_fmt yuv420p -r 30 -t ${total.toFixed(3)} ${vout}`, { stdio: 'inherit' });
   // audio: master to about -14 LUFS (two-pass loudnorm), then mux
   const raw = `${root}/audio-raw.wav`;
   const meas = execSync(`ffmpeg -v info -i ${raw} -af loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json -f null - 2>&1 | sed -n '/^{/,/^}/p'`).toString();
